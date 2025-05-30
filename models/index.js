@@ -31,6 +31,7 @@ db.HearingComment = require('./hearingComment.model')(sequelize, Sequelize);
 db.HearingCommentDoc = require('./hearingCommentDoc.model')(sequelize, Sequelize);
 db.CaseComment = require('./caseComment.model')(sequelize, Sequelize);
 db.CaseCommentDoc = require('./caseCommentDoc.model')(sequelize, Sequelize);
+db.UploadLink = require('./uploadLink.model')(sequelize, Sequelize);
 
 // Define associations
 
@@ -116,6 +117,26 @@ db.CaseComment.hasMany(db.CaseCommentDoc, {
 db.CaseCommentDoc.belongsTo(db.CaseComment, {
   foreignKey: 'caseCommentId',
   as: 'comment'
+});
+
+// Case - UploadLink relationship (1:Many)
+db.Case.hasMany(db.UploadLink, {
+  foreignKey: 'caseId',
+  as: 'uploadLinks'
+});
+db.UploadLink.belongsTo(db.Case, {
+  foreignKey: 'caseId',
+  as: 'case'
+});
+
+// Admin - UploadLink relationship (1:Many)
+db.Admin.hasMany(db.UploadLink, {
+  foreignKey: 'createdBy',
+  as: 'uploadLinks'
+});
+db.UploadLink.belongsTo(db.Admin, {
+  foreignKey: 'createdBy',
+  as: 'admin'
 });
 
 module.exports = db;

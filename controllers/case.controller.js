@@ -1,6 +1,6 @@
 const { Case, Client, Admin, Hearing, CaseComment, CaseCommentDoc } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
-const upload = require('../utils/fileUpload');
+const { upload, handleChunkedUpload } = require('../utils/fileUpload');
 
 // @desc    Get all cases
 // @route   GET /api/cases
@@ -77,7 +77,8 @@ exports.getCase = async (req, res, next) => {
           include: [
             {
               model: CaseCommentDoc,
-              as: 'documents'
+              as: 'documents',
+              attributes: ['id', 'fileName', 'fileSize', 'fileType']
             }
           ]
         }
@@ -183,18 +184,18 @@ exports.updateCase = async (req, res, next) => {
 
 // @desc    Delete case
 // @route   DELETE /api/cases/:id
-// @access  Private/Super-Admin
+// @access  Private
 exports.deleteCase = async (req, res, next) => {
   try {
-    // Check if user is super-admin
-    if (req.user.role !== 'super-admin') {
-      return next(new ErrorResponse('Not authorized to delete cases', 403));
-    }
-
     const caseItem = await Case.findByPk(req.params.id);
     
     if (!caseItem) {
       return next(new ErrorResponse(`Case not found with id of ${req.params.id}`, 404));
+    }
+    
+    // Check ownership if not super-admin
+    if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
+      return next(new ErrorResponse('Not authorized to delete this case', 403));
     }
     
     await caseItem.destroy();
@@ -202,6 +203,137 @@ exports.deleteCase = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: {}
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Add comment to case with optional files
+// @route   POST /api/cases/:id/comments
+// @access  Private
+exports.addCaseComment = async (req, res, next) => {
+  try {
+    const caseItem = await Case.findByPk(req.params.id);
+    
+    if (!caseItem) {
+      return next(new ErrorResponse(`Case not found with id of ${req.params.id}`, 404));
+    }
+    
+    // Check ownership if not super-admin
+    if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
+      return next(new ErrorResponse('Not authorized to add comment to this case', 403));
+    }
+
+    // Handle file upload if present
+    const uploadHandler = upload.array('files', 10); // Allow up to 10 files
+
+    uploadHandler(req, res, async (err) => {
+      if (err) {
+        return next(new ErrorResponse(`Problem with file upload: ${err.message}`, 400));
+      }
+
+      // Create comment
+      const comment = await CaseComment.create({
+        caseId: caseItem.id,
+        text: req.body.text,
+        createdBy: req.user.id
+      });
+
+      // Handle uploaded files
+      if (req.files && req.files.length > 0) {
+        const documents = await Promise.all(req.files.map(file => 
+          CaseCommentDoc.create({
+            caseCommentId: comment.id,
+            filePath: file.path,
+            fileName: file.originalname,
+            fileType: file.mimetype,
+            fileSize: file.size
+          })
+        ));
+      }
+
+      // Fetch comment with documents
+      const commentWithDocs = await CaseComment.findByPk(comment.id, {
+        include: [{
+          model: CaseCommentDoc,
+          as: 'documents',
+          attributes: ['id', 'fileName', 'fileSize', 'fileType']
+        }]
+      });
+
+      res.status(201).json({
+        success: true,
+        data: commentWithDocs
+      });
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Upload document to case comment
+// @route   POST /api/cases/comments/:id/documents
+// @access  Private
+exports.uploadCaseCommentDocument = async (req, res, next) => {
+  try {
+    const comment = await CaseComment.findByPk(req.params.id, {
+      include: [{ model: Case, as: 'case' }]
+    });
+    
+    if (!comment) {
+      return next(new ErrorResponse(`Comment not found with id of ${req.params.id}`, 404));
+    }
+    
+    // Check ownership if not super-admin
+    if (req.user.role !== 'super-admin' && comment.case.createdBy !== req.user.id) {
+      return next(new ErrorResponse('Not authorized to upload document to this comment', 403));
+    }
+    
+    // Handle chunked upload
+    const uploadHandler = upload.single('file');
+    uploadHandler(req, res, async (err) => {
+      if (err) {
+        return next(new ErrorResponse(`Problem with file upload: ${err.message}`, 400));
+      }
+      
+      if (!req.file && !req.finalFile) {
+        return next(new ErrorResponse('Please upload a file', 400));
+      }
+      
+      // Handle chunked upload
+      if (req.query.resumableChunkNumber) {
+        return handleChunkedUpload(req, res, async () => {
+          if (req.finalFile) {
+            const document = await CaseCommentDoc.create({
+              caseCommentId: comment.id,
+              filePath: req.finalFile.path,
+              fileName: req.finalFile.originalname,
+              fileType: req.finalFile.mimetype,
+              fileSize: req.finalFile.size
+            });
+            
+            res.status(201).json({
+              success: true,
+              data: document
+            });
+          }
+        });
+      }
+      
+      // Handle regular upload
+      const document = await CaseCommentDoc.create({
+        caseCommentId: comment.id,
+        filePath: req.file.path,
+        fileName: req.file.originalname,
+        fileType: req.file.mimetype,
+        fileSize: req.file.size
+      });
+      
+      res.status(201).json({
+        success: true,
+        data: document
+      });
     });
   } catch (error) {
     next(error);

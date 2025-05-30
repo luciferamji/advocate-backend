@@ -1,6 +1,6 @@
 const { Hearing, Case, HearingComment, HearingCommentDoc } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
-const upload = require('../utils/fileUpload');
+const { upload, handleChunkedUpload } = require('../utils/fileUpload');
 const { Op } = require('sequelize');
 
 // @desc    Get all hearings
@@ -72,7 +72,8 @@ exports.getHearing = async (req, res, next) => {
           include: [
             {
               model: HearingCommentDoc,
-              as: 'documents'
+              as: 'documents',
+              attributes: ['id', 'fileName', 'fileSize', 'fileType']
             }
           ]
         }
@@ -194,18 +195,13 @@ exports.deleteHearing = async (req, res, next) => {
   }
 };
 
-// @desc    Add comment to hearing
+// @desc    Add comment to hearing with optional files
 // @route   POST /api/hearings/:id/comments
 // @access  Private
 exports.addHearingComment = async (req, res, next) => {
   try {
     const hearing = await Hearing.findByPk(req.params.id, {
-      include: [
-        {
-          model: Case,
-          as: 'case'
-        }
-      ]
+      include: [{ model: Case, as: 'case' }]
     });
     
     if (!hearing) {
@@ -216,17 +212,48 @@ exports.addHearingComment = async (req, res, next) => {
     if (req.user.role !== 'super-admin' && hearing.case.createdBy !== req.user.id) {
       return next(new ErrorResponse('Not authorized to add comment to this hearing', 403));
     }
-    
-    // Create comment
-    const comment = await HearingComment.create({
-      hearingId: hearing.id,
-      text: req.body.text,
-      createdBy: req.user.id
-    });
-    
-    res.status(201).json({
-      success: true,
-      data: comment
+
+    // Handle file upload if present
+    const uploadHandler = upload.array('files', 10); // Allow up to 10 files
+
+    uploadHandler(req, res, async (err) => {
+      if (err) {
+        return next(new ErrorResponse(`Problem with file upload: ${err.message}`, 400));
+      }
+
+      // Create comment
+      const comment = await HearingComment.create({
+        hearingId: hearing.id,
+        text: req.body.text,
+        createdBy: req.user.id
+      });
+
+      // Handle uploaded files
+      if (req.files && req.files.length > 0) {
+        const documents = await Promise.all(req.files.map(file => 
+          HearingCommentDoc.create({
+            hearingCommentId: comment.id,
+            filePath: file.path,
+            fileName: file.originalname,
+            fileType: file.mimetype,
+            fileSize: file.size
+          })
+        ));
+      }
+
+      // Fetch comment with documents
+      const commentWithDocs = await HearingComment.findByPk(comment.id, {
+        include: [{
+          model: HearingCommentDoc,
+          as: 'documents',
+          attributes: ['id', 'fileName', 'fileSize', 'fileType']
+        }]
+      });
+
+      res.status(201).json({
+        success: true,
+        data: commentWithDocs
+      });
     });
   } catch (error) {
     next(error);
@@ -239,18 +266,11 @@ exports.addHearingComment = async (req, res, next) => {
 exports.uploadHearingCommentDocument = async (req, res, next) => {
   try {
     const comment = await HearingComment.findByPk(req.params.id, {
-      include: [
-        {
-          model: Hearing,
-          as: 'hearing',
-          include: [
-            {
-              model: Case,
-              as: 'case'
-            }
-          ]
-        }
-      ]
+      include: [{
+        model: Hearing,
+        as: 'hearing',
+        include: [{ model: Case, as: 'case' }]
+      }]
     });
     
     if (!comment) {
@@ -262,19 +282,38 @@ exports.uploadHearingCommentDocument = async (req, res, next) => {
       return next(new ErrorResponse('Not authorized to upload document to this comment', 403));
     }
     
-    // Handle file upload
-    const uploadHandler = upload.single('document');
-    
+    // Handle chunked upload
+    const uploadHandler = upload.single('file');
     uploadHandler(req, res, async (err) => {
       if (err) {
         return next(new ErrorResponse(`Problem with file upload: ${err.message}`, 400));
       }
       
-      if (!req.file) {
+      if (!req.file && !req.finalFile) {
         return next(new ErrorResponse('Please upload a file', 400));
       }
       
-      // Create document record
+      // Handle chunked upload
+      if (req.query.resumableChunkNumber) {
+        return handleChunkedUpload(req, res, async () => {
+          if (req.finalFile) {
+            const document = await HearingCommentDoc.create({
+              hearingCommentId: comment.id,
+              filePath: req.finalFile.path,
+              fileName: req.finalFile.originalname,
+              fileType: req.finalFile.mimetype,
+              fileSize: req.finalFile.size
+            });
+            
+            res.status(201).json({
+              success: true,
+              data: document
+            });
+          }
+        });
+      }
+      
+      // Handle regular upload
       const document = await HearingCommentDoc.create({
         hearingCommentId: comment.id,
         filePath: req.file.path,
