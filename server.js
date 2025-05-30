@@ -4,6 +4,7 @@ const cookieParser = require('cookie-parser');
 const dotenv = require('dotenv');
 const path = require('path');
 const { sequelize } = require('./models');
+const createSuperAdmin = require('./utils/createSuperAdmin');
 
 // Load environment variables
 dotenv.config();
@@ -16,8 +17,8 @@ const PORT = process.env.PORT || 5000;
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? process.env.FRONTEND_URL 
-    : 'http://localhost:3000',
-  credentials: true
+    : 'http://localhost:5173',
+  credentials: true,
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -52,6 +53,9 @@ const startServer = async () => {
     // Sync database
     await sequelize.sync({ alter: process.env.NODE_ENV === 'development' });
     console.log('Database connected successfully');
+    
+    // Create super admin if doesn't exist
+    await createSuperAdmin();
     
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

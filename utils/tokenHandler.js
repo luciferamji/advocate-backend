@@ -26,11 +26,13 @@ exports.sendTokenResponse = (user, statusCode, res) => {
     .cookie('jwt', token, options)
     .json({
       success: true,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
+      data: {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        }
       }
     });
 };
