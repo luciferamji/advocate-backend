@@ -1,12 +1,11 @@
-const jwt = require('jsonwebtoken');
 const { Admin } = require('../models');
 
 exports.protect = async (req, res, next) => {
   try {
-    const token = req.cookies.jwt;
+    const sessionId = req.cookies.session;
 
-    // Check if token exists
-    if (!token) {
+    // Check if session exists
+    if (!sessionId) {
       return res.status(401).json({
         success: false,
         message: 'Not authorized to access this route'
@@ -14,16 +13,16 @@ exports.protect = async (req, res, next) => {
     }
 
     try {
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
-      // Get user from token
-      const user = await Admin.findByPk(decoded.id);
+      // Get user from session
+      const user = await Admin.findOne({
+        where: { sessionId },
+        attributes: { exclude: ['password'] }
+      });
       
       if (!user) {
         return res.status(401).json({
           success: false,
-          message: 'User not found'
+          message: 'Invalid session'
         });
       }
       
