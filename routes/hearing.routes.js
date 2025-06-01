@@ -4,22 +4,27 @@ const {
   getHearing,
   createHearing,
   updateHearing,
-  deleteHearing
+  deleteHearing,
+  getHearingComments,
+  createHearingComment
 } = require('../controllers/hearing.controller');
 const { protect } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
-// Apply middleware to all routes
-router.use(protect);
-
+// Protected routes
 router.route('/')
-  .get(getHearings)
-  .post(createHearing);
+  .get(protect, getHearings)
+  .post(protect, createHearing);
 
 router.route('/:id')
-  .get(getHearing)
-  .put(updateHearing)
-  .delete(deleteHearing);
+  .get(protect, getHearing)
+  .put(protect, updateHearing)
+  .delete(protect, deleteHearing);
+
+// Public routes for comments
+router.route('/:id/comments')
+  .get(getHearingComments)
+  .post(createHearingComment);
 
 module.exports = router;
