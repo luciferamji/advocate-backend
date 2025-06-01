@@ -11,15 +11,23 @@ exports.createUploadLink = async (req, res, next) => {
   try {
     const { caseId, email, phone, expiryHours = 24 } = req.body;
 
+    if (!caseId || !email || !phone) {
+      return next(new ErrorResponse(
+        'Please provide all required fields',
+        'VALIDATION_ERROR',
+        { required: ['caseId', 'email', 'phone'] }
+      ));
+    }
+
     // Check if case exists and user has access
     const caseItem = await Case.findByPk(caseId);
     if (!caseItem) {
-      return next(new ErrorResponse('Case not found', 404));
+      return next(new ErrorResponse('Case not found', 'CASE_NOT_FOUND', { caseId }));
     }
 
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to create upload link for this case', 403));
+      return next(new ErrorResponse('Not authorized to create upload link for this case', 'UNAUTHORIZED_ACCESS'));
     }
 
     // Create upload link
@@ -55,7 +63,7 @@ exports.createUploadLink = async (req, res, next) => {
       data: response
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'UPLOAD_LINK_CREATE_ERROR'));
   }
 };
 
@@ -65,23 +73,28 @@ exports.createUploadLink = async (req, res, next) => {
 exports.verifyPin = async (req, res, next) => {
   try {
     const { pin } = req.body;
+
+    if (!pin) {
+      return next(new ErrorResponse('PIN is required', 'VALIDATION_ERROR'));
+    }
+
     const link = await UploadLink.findByPk(req.params.id);
 
     if (!link) {
-      return next(new ErrorResponse('Invalid upload link', 404));
+      return next(new ErrorResponse('Invalid upload link', 'LINK_NOT_FOUND'));
     }
 
     if (link.used) {
-      return next(new ErrorResponse('This upload link has already been used', 400));
+      return next(new ErrorResponse('This upload link has already been used', 'LINK_ALREADY_USED'));
     }
 
     if (new Date() > link.expiresAt) {
-      return next(new ErrorResponse('This upload link has expired', 400));
+      return next(new ErrorResponse('This upload link has expired', 'LINK_EXPIRED'));
     }
 
     const isMatch = await bcrypt.compare(pin, link.pin);
     if (!isMatch) {
-      return next(new ErrorResponse('Invalid PIN', 401));
+      return next(new ErrorResponse('Invalid PIN', 'INVALID_PIN'));
     }
 
     res.status(200).json({
@@ -89,7 +102,7 @@ exports.verifyPin = async (req, res, next) => {
       message: 'PIN verified successfully'
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'PIN_VERIFICATION_ERROR'));
   }
 };
 
@@ -101,15 +114,15 @@ exports.uploadDocument = async (req, res, next) => {
     const link = await UploadLink.findByPk(req.params.id);
 
     if (!link) {
-      return next(new ErrorResponse('Invalid upload link', 404));
+      return next(new ErrorResponse('Invalid upload link', 'LINK_NOT_FOUND'));
     }
 
     if (link.used) {
-      return next(new ErrorResponse('This upload link has already been used', 400));
+      return next(new ErrorResponse('This upload link has already been used', 'LINK_ALREADY_USED'));
     }
 
     if (new Date() > link.expiresAt) {
-      return next(new ErrorResponse('This upload link has expired', 400));
+      return next(new ErrorResponse('This upload link has expired', 'LINK_EXPIRED'));
     }
 
     // Handle file upload
@@ -117,11 +130,15 @@ exports.uploadDocument = async (req, res, next) => {
 
     uploadHandler(req, res, async (err) => {
       if (err) {
-        return next(new ErrorResponse(`Problem with file upload: ${err.message}`, 400));
+        return next(new ErrorResponse(
+          'Problem with file upload',
+          'FILE_UPLOAD_ERROR',
+          { details: err.message }
+        ));
       }
 
       if (!req.file) {
-        return next(new ErrorResponse('Please upload a file', 400));
+        return next(new ErrorResponse('Please upload a file', 'NO_FILE_UPLOADED'));
       }
 
       // Create case comment
@@ -153,6 +170,6 @@ exports.uploadDocument = async (req, res, next) => {
       });
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'DOCUMENT_UPLOAD_ERROR'));
   }
 };

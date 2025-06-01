@@ -1,5 +1,6 @@
 const { Case, Client, Hearing } = require('../models');
 const { Op } = require('sequelize');
+const ErrorResponse = require('../utils/errorHandler');
 
 // @desc    Get dashboard statistics
 // @route   GET /api/dashboard/stats
@@ -34,7 +35,7 @@ exports.getDashboardStats = async (req, res, next) => {
       upcomingHearings
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'DASHBOARD_STATS_ERROR'));
   }
 };
 
@@ -104,6 +105,6 @@ exports.getRecentItems = async (req, res, next) => {
       upcomingHearings: formattedHearings
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'DASHBOARD_RECENT_ERROR'));
   }
 };
