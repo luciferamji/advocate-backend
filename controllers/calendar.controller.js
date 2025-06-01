@@ -28,18 +28,18 @@ exports.getCalendarData = async (req, res, next) => {
     
     // Filter by date range if provided
     if (req.query.startDate && req.query.endDate) {
-      query.hearingDate = {
+      query.date = {
         [Op.between]: [
           new Date(req.query.startDate),
           new Date(req.query.endDate)
         ]
       };
     } else if (req.query.startDate) {
-      query.hearingDate = {
+      query.date = {
         [Op.gte]: new Date(req.query.startDate)
       };
     } else if (req.query.endDate) {
-      query.hearingDate = {
+      query.date = {
         [Op.lte]: new Date(req.query.endDate)
       };
     }
@@ -62,23 +62,23 @@ exports.getCalendarData = async (req, res, next) => {
           ]
         }
       ],
-      order: [['hearingDate', 'ASC']]
+      order: [['date', 'ASC'], ['time', 'ASC']]
     });
     
     // Format the data for calendar view
     const calendarData = hearings.map(hearing => ({
-      id: hearing.id,
-      title: `Case: ${hearing.case.caseId}`,
-      start: hearing.hearingDate,
+      id: hearing.id.toString(),
+      title: `Case: ${hearing.case.caseNumber}`,
+      start: new Date(hearing.date.toISOString().split('T')[0] + 'T' + hearing.time),
       client: {
-        id: hearing.case.client.id,
+        id: hearing.case.client.id.toString(),
         name: hearing.case.client.name,
         clientId: hearing.case.client.clientId
       },
       case: {
-        id: hearing.case.id,
-        caseId: hearing.case.caseId,
-        courtDetails: hearing.case.courtDetails
+        id: hearing.case.id.toString(),
+        caseNumber: hearing.case.caseNumber,
+        courtDetails: hearing.case.courtName
       },
       notes: hearing.notes,
       status: hearing.status
@@ -115,10 +115,7 @@ exports.getTodaysHearings = async (req, res, next) => {
     
     const hearings = await Hearing.findAll({
       where: {
-        hearingDate: {
-          [Op.gte]: today,
-          [Op.lt]: tomorrow
-        }
+        date: today
       },
       include: [
         {
@@ -134,16 +131,16 @@ exports.getTodaysHearings = async (req, res, next) => {
           ]
         }
       ],
-      order: [['hearingDate', 'ASC']]
+      order: [['time', 'ASC']]
     });
     
     // Format the data
     const todaysHearings = hearings.map(hearing => ({
-      id: hearing.id,
-      time: hearing.hearingDate,
+      id: hearing.id.toString(),
+      time: hearing.time,
       client: hearing.case.client.name,
-      case: hearing.case.caseId,
-      courtDetails: hearing.case.courtDetails,
+      case: hearing.case.caseNumber,
+      courtDetails: hearing.case.courtName,
       status: hearing.status
     }));
     
@@ -185,9 +182,8 @@ exports.getUpcomingHearings = async (req, res, next) => {
     
     const hearings = await Hearing.findAll({
       where: {
-        hearingDate: {
-          [Op.gte]: today,
-          [Op.lt]: endDate
+        date: {
+          [Op.between]: [today, endDate]
         }
       },
       include: [
@@ -204,14 +200,14 @@ exports.getUpcomingHearings = async (req, res, next) => {
           ]
         }
       ],
-      order: [['hearingDate', 'ASC']]
+      order: [['date', 'ASC'], ['time', 'ASC']]
     });
     
     // Format the data and group by date
     const upcomingHearings = {};
     
     hearings.forEach(hearing => {
-      const date = hearing.hearingDate.toISOString().split('T')[0];
+      const date = hearing.date.toISOString().split('T')[0];
       
       if (!upcomingHearings[date]) {
         upcomingHearings[date] = [];
@@ -219,10 +215,10 @@ exports.getUpcomingHearings = async (req, res, next) => {
       
       upcomingHearings[date].push({
         id: hearing.id.toString(),
-        time: hearing.hearingDate,
+        time: hearing.time,
         client: hearing.case.client.name,
-        case: hearing.case.caseId,
-        courtDetails: hearing.case.courtDetails,
+        case: hearing.case.caseNumber,
+        courtDetails: hearing.case.courtName,
         status: hearing.status
       });
     });
