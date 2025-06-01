@@ -66,23 +66,30 @@ exports.getCalendarData = async (req, res, next) => {
     });
     
     // Format the data for calendar view
-    const calendarData = hearings.map(hearing => ({
-      id: hearing.id.toString(),
-      title: `Case: ${hearing.case.caseNumber}`,
-      start: new Date(hearing.date.toISOString().split('T')[0] + 'T' + hearing.time),
-      client: {
-        id: hearing.case.client.id.toString(),
-        name: hearing.case.client.name,
-        clientId: hearing.case.client.clientId
-      },
-      case: {
-        id: hearing.case.id.toString(),
-        caseNumber: hearing.case.caseNumber,
-        courtDetails: hearing.case.courtName
-      },
-      notes: hearing.notes,
-      status: hearing.status
-    }));
+    const calendarData = hearings.map(hearing => {
+      // Create a new Date object from the date and time
+      const hearingDate = new Date(hearing.date);
+      const [hours, minutes] = hearing.time.split(':');
+      hearingDate.setHours(parseInt(hours), parseInt(minutes));
+
+      return {
+        id: hearing.id.toString(),
+        title: `Case: ${hearing.case.caseNumber}`,
+        start: hearingDate.toISOString(),
+        client: {
+          id: hearing.case.client.id.toString(),
+          name: hearing.case.client.name,
+          clientId: hearing.case.client.clientId
+        },
+        case: {
+          id: hearing.case.id.toString(),
+          caseNumber: hearing.case.caseNumber,
+          courtDetails: hearing.case.courtName
+        },
+        notes: hearing.notes,
+        status: hearing.status
+      };
+    });
     
     res.status(200).json({
       success: true,
@@ -103,7 +110,7 @@ exports.getTodaysHearings = async (req, res, next) => {
     
     // If not super-admin, only show own hearings
     if (req.user.role !== 'super-admin') {
-      caseQuery.createdBy = req.user.id;
+      caseQuery.advocateId = req.user.id;
     }
     
     // Get today's date
@@ -163,7 +170,7 @@ exports.getUpcomingHearings = async (req, res, next) => {
     
     // If not super-admin, only show own hearings
     if (req.user.role !== 'super-admin') {
-      caseQuery.createdBy = req.user.id;
+      caseQuery.advocateId = req.user.id;
     }
     
     // Get today's date
@@ -207,7 +214,7 @@ exports.getUpcomingHearings = async (req, res, next) => {
     const upcomingHearings = {};
     
     hearings.forEach(hearing => {
-      const date = hearing.date.toISOString().split('T')[0];
+      const date = new Date(hearing.date).toISOString().split('T')[0];
       
       if (!upcomingHearings[date]) {
         upcomingHearings[date] = [];
