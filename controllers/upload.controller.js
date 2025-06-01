@@ -1,8 +1,12 @@
+
 const path = require('path');
-const fs = require('fs').promises;
+const fs = require('fs-extra');
 const { v4: uuidv4 } = require('uuid');
 const ErrorResponse = require('../utils/errorHandler');
 const { upload } = require('../utils/fileUpload');
+
+const CHUNKS_DIR = path.join(process.env.UPLOAD_DIR || 'uploads', 'chunks');
+const UPLOADS_DIR = path.join(process.env.UPLOAD_DIR || 'uploads');
 
 // @desc    Check if chunk exists
 // @route   GET /api/upload/chunk
@@ -10,22 +14,17 @@ const { upload } = require('../utils/fileUpload');
 exports.checkChunk = async (req, res, next) => {
   try {
     const { resumableIdentifier, resumableChunkNumber } = req.query;
-    
     if (!resumableIdentifier || !resumableChunkNumber) {
       return next(new ErrorResponse('Missing required parameters', 'INVALID_REQUEST'));
     }
 
-    const chunkPath = path.join(
-      process.env.UPLOAD_DIR || 'uploads',
-      'chunks',
-      `${resumableIdentifier}.part${resumableChunkNumber}`
-    );
+    const chunkPath = path.join(CHUNKS_DIR, `${resumableIdentifier}.part${resumableChunkNumber}`);
 
     try {
       await fs.access(chunkPath);
       res.status(200).end();
     } catch {
-      res.status(404).end();
+      res.status(204).end();
     }
   } catch (error) {
     next(new ErrorResponse(error.message, 'CHUNK_CHECK_ERROR'));
@@ -48,10 +47,24 @@ exports.uploadChunk = async (req, res, next) => {
         return next(new ErrorResponse('No file uploaded', 'NO_FILE'));
       }
 
-      res.status(200).json({ success: true });
+      const {
+        resumableChunkNumber,
+        resumableIdentifier,
+      } = req.body;
+
+      const chunkNumber = parseInt(resumableChunkNumber, 10);
+      const identifier = resumableIdentifier;
+
+      const chunkFilename = `${identifier}.part${chunkNumber}`;
+      const chunkFilePath = path.join(CHUNKS_DIR, chunkFilename);
+
+      await fs.ensureDir(CHUNKS_DIR);
+      await fs.rename(req.file.path, chunkFilePath);
+
+      return res.status(200).json({ success: true, chunk: chunkNumber });
     });
   } catch (error) {
-    next(new ErrorResponse(error.message, 'CHUNK_UPLOAD_ERROR'));
+    return next(new ErrorResponse(error.message, 'CHUNK_UPLOAD_ERROR'));
   }
 };
 
@@ -66,45 +79,38 @@ exports.completeUpload = async (req, res, next) => {
       return next(new ErrorResponse('Missing required parameters', 'INVALID_REQUEST'));
     }
 
-    const chunksDir = path.join(process.env.UPLOAD_DIR || 'uploads', 'chunks');
-    const uploadsDir = path.join(process.env.UPLOAD_DIR || 'uploads');
     const fileId = uuidv4();
     const fileExt = path.extname(filename);
     const finalFilename = `${fileId}${fileExt}`;
-    const finalPath = path.join(uploadsDir, finalFilename);
+    const finalPath = path.join(UPLOADS_DIR, finalFilename);
 
-    // Ensure directories exist
-    await fs.mkdir(chunksDir, { recursive: true });
-    await fs.mkdir(uploadsDir, { recursive: true });
+    await fs.ensureDir(CHUNKS_DIR);
+    await fs.ensureDir(UPLOADS_DIR);
 
-    // Get all chunks
-    const chunks = await fs.readdir(chunksDir);
-    const fileChunks = chunks
-      .filter(chunk => chunk.startsWith(identifier))
+    const chunkFiles = (await fs.readdir(CHUNKS_DIR))
+      .filter(chunk => chunk.startsWith(identifier + '.part'))
       .sort((a, b) => {
         const aNum = parseInt(a.split('.part')[1]);
         const bNum = parseInt(b.split('.part')[1]);
         return aNum - bNum;
       });
 
-    if (fileChunks.length !== parseInt(totalChunks)) {
+    if (chunkFiles.length !== parseInt(totalChunks)) {
       return next(new ErrorResponse('Missing chunks', 'INCOMPLETE_UPLOAD'));
     }
 
-    // Combine chunks
     const writeStream = fs.createWriteStream(finalPath);
-    
-    for (const chunk of fileChunks) {
-      const chunkPath = path.join(chunksDir, chunk);
-      const chunkData = await fs.readFile(chunkPath);
-      await writeStream.write(chunkData);
-      await fs.unlink(chunkPath);
+
+    for (const chunkFile of chunkFiles) {
+      const chunkPath = path.join(CHUNKS_DIR, chunkFile);
+      const data = await fs.readFile(chunkPath);
+      writeStream.write(data);
+      await fs.remove(chunkPath);
     }
 
     writeStream.end();
 
-    // Get file type
-    const fileType = path.extname(filename).substring(1);
+    const fileType = fileExt.substring(1);
 
     res.status(200).json({
       id: fileId,

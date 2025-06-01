@@ -43,6 +43,13 @@ const storage = multer.diskStorage({
 
 // File filter
 const fileFilter = (req, file, cb) => {
+  // Allow all files for resumable chunk uploads
+
+
+  if (req.baseUrl.includes('/api/upload')) {
+    return cb(null, true);
+  }
+
   const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   const mimetype = allowedTypes.test(file.mimetype);
