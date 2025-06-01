@@ -61,12 +61,12 @@ db.Case.belongsTo(db.Client, {
 
 // Admin - Case relationship (1:Many)
 db.Admin.hasMany(db.Case, {
-  foreignKey: 'createdBy',
+  foreignKey: 'advocateId',
   as: 'cases'
 });
 db.Case.belongsTo(db.Admin, {
-  foreignKey: 'createdBy',
-  as: 'admin'
+  foreignKey: 'advocateId',
+  as: 'advocate'
 });
 
 // Case - Hearing relationship (1:Many)
