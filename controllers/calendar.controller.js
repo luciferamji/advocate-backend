@@ -66,25 +66,23 @@ exports.getCalendarData = async (req, res, next) => {
     });
     
     // Format the data for calendar view
-    const calendarData = hearings.map(hearing => {
-      return {
-        id: hearing.id,
-        title: `Case: ${hearing.case.caseId}`,
-        start: hearing.hearingDate,
-        client: {
-          id: hearing.case.client.id,
-          name: hearing.case.client.name,
-          clientId: hearing.case.client.clientId
-        },
-        case: {
-          id: hearing.case.id,
-          caseId: hearing.case.caseId,
-          courtDetails: hearing.case.courtDetails
-        },
-        notes: hearing.notes,
-        status: hearing.status
-      };
-    });
+    const calendarData = hearings.map(hearing => ({
+      id: hearing.id,
+      title: `Case: ${hearing.case.caseId}`,
+      start: hearing.hearingDate,
+      client: {
+        id: hearing.case.client.id,
+        name: hearing.case.client.name,
+        clientId: hearing.case.client.clientId
+      },
+      case: {
+        id: hearing.case.id,
+        caseId: hearing.case.caseId,
+        courtDetails: hearing.case.courtDetails
+      },
+      notes: hearing.notes,
+      status: hearing.status
+    }));
     
     res.status(200).json({
       success: true,
@@ -92,7 +90,7 @@ exports.getCalendarData = async (req, res, next) => {
       data: calendarData
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'CALENDAR_FETCH_ERROR'));
   }
 };
 
@@ -140,16 +138,14 @@ exports.getTodaysHearings = async (req, res, next) => {
     });
     
     // Format the data
-    const todaysHearings = hearings.map(hearing => {
-      return {
-        id: hearing.id,
-        time: hearing.hearingDate,
-        client: hearing.case.client.name,
-        case: hearing.case.caseId,
-        courtDetails: hearing.case.courtDetails,
-        status: hearing.status
-      };
-    });
+    const todaysHearings = hearings.map(hearing => ({
+      id: hearing.id,
+      time: hearing.hearingDate,
+      client: hearing.case.client.name,
+      case: hearing.case.caseId,
+      courtDetails: hearing.case.courtDetails,
+      status: hearing.status
+    }));
     
     res.status(200).json({
       success: true,
@@ -157,7 +153,7 @@ exports.getTodaysHearings = async (req, res, next) => {
       data: todaysHearings
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'TODAYS_HEARINGS_FETCH_ERROR'));
   }
 };
 
@@ -179,6 +175,10 @@ exports.getUpcomingHearings = async (req, res, next) => {
     
     // Default to next 7 days if not specified
     const days = req.query.days ? parseInt(req.query.days) : 7;
+    
+    if (isNaN(days) || days < 1) {
+      return next(new ErrorResponse('Invalid days parameter', 'INVALID_PARAMETER', { parameter: 'days' }));
+    }
     
     const endDate = new Date(today);
     endDate.setDate(endDate.getDate() + days);
@@ -218,7 +218,7 @@ exports.getUpcomingHearings = async (req, res, next) => {
       }
       
       upcomingHearings[date].push({
-        id: hearing.id,
+        id: hearing.id.toString(),
         time: hearing.hearingDate,
         client: hearing.case.client.name,
         case: hearing.case.caseId,
@@ -232,6 +232,6 @@ exports.getUpcomingHearings = async (req, res, next) => {
       data: upcomingHearings
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'UPCOMING_HEARINGS_FETCH_ERROR'));
   }
 };
