@@ -3,7 +3,8 @@ const {
   getAdvocates, 
   getAdvocate, 
   createAdvocate, 
-  updateAdvocate 
+  updateAdvocate,
+  deleteAdvocate
 } = require('../controllers/advocate.controller');
 const { protect, authorize } = require('../middleware/auth.middleware');
 
@@ -19,6 +20,7 @@ router.route('/')
 
 router.route('/:id')
   .get(getAdvocate)
-  .put(updateAdvocate);
+  .put(updateAdvocate)
+  .delete(deleteAdvocate);
 
 module.exports = router;

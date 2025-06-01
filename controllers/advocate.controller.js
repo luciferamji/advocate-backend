@@ -1,4 +1,5 @@
-const { Admin, Advocate, Case, Client } = require('../models');
+const bcrypt = require('bcryptjs');
+const { Admin, Advocate, Case } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 
@@ -16,33 +17,27 @@ exports.getAdvocates = async (req, res, next) => {
       sortOrder = 'asc'
     } = req.query;
 
-    const offset = parseInt(page) * parseInt(limit);
-    const parsedLimit = parseInt(limit);
-
-    const whereClause = {};
-    const adminWhereClause = {};
+    const whereClause = {
+      role: 'advocate'
+    };
 
     if (status) {
-      adminWhereClause.status = status;
+      whereClause.status = status;
     }
 
     if (search) {
-      adminWhereClause[Op.or] = [
+      whereClause[Op.or] = [
         { name: { [Op.iLike]: `%${search}%` } },
         { email: { [Op.iLike]: `%${search}%` } }
       ];
     }
 
     const advocates = await Admin.findAndCountAll({
-      where: {
-        role: 'advocate',
-        ...adminWhereClause
-      },
+      where: whereClause,
       include: [
         {
           model: Advocate,
-          required: true,
-          where: whereClause
+          required: true
         },
         {
           model: Case,
@@ -51,8 +46,8 @@ exports.getAdvocates = async (req, res, next) => {
         }
       ],
       order: [[sortBy, sortOrder.toUpperCase()]],
-      limit: parsedLimit,
-      offset: offset,
+      limit: parseInt(limit),
+      offset: parseInt(page) * parseInt(limit),
       distinct: true
     });
 
@@ -70,9 +65,12 @@ exports.getAdvocates = async (req, res, next) => {
 
     res.status(200).json({
       advocates: formattedAdvocates,
-      total: advocates.count,
-      page: parseInt(page),
-      limit: parsedLimit
+      pagination: {
+        total: advocates.count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(advocates.count / parseInt(limit))
+      }
     });
   } catch (error) {
     next(error);
@@ -97,23 +95,7 @@ exports.getAdvocate = async (req, res, next) => {
         {
           model: Case,
           as: 'cases',
-          include: [
-            {
-              model: Client,
-              as: 'client',
-              attributes: ['name']
-            },
-            {
-              model: Hearing,
-              as: 'hearings',
-              required: false,
-              where: {
-                status: 'scheduled'
-              },
-              order: [['hearingDate', 'ASC']],
-              limit: 1
-            }
-          ]
+          required: false
         }
       ]
     });
@@ -121,15 +103,6 @@ exports.getAdvocate = async (req, res, next) => {
     if (!advocate) {
       return next(new ErrorResponse(`Advocate not found with id of ${req.params.id}`, 404));
     }
-
-    const formattedCases = advocate.cases.map(caseItem => ({
-      id: caseItem.id.toString(),
-      caseNumber: caseItem.caseId,
-      title: caseItem.title || '',
-      clientName: caseItem.client.name,
-      status: caseItem.status.toUpperCase(),
-      nextHearing: caseItem.hearings[0]?.hearingDate || undefined
-    }));
 
     res.status(200).json({
       id: advocate.id.toString(),
@@ -141,7 +114,13 @@ exports.getAdvocate = async (req, res, next) => {
       status: advocate.status || 'active',
       joinDate: advocate.createdAt,
       caseCount: advocate.cases.length,
-      cases: formattedCases
+      cases: advocate.cases.map(caseItem => ({
+        id: caseItem.id.toString(),
+        caseNumber: caseItem.caseNumber,
+        title: caseItem.title,
+        status: caseItem.status,
+        createdAt: caseItem.createdAt
+      }))
     });
   } catch (error) {
     next(error);
@@ -153,7 +132,7 @@ exports.getAdvocate = async (req, res, next) => {
 // @access  Private/Super-Admin
 exports.createAdvocate = async (req, res, next) => {
   try {
-    const { name, email, phone, barNumber, specialization, status } = req.body;
+    const { name, email, phone, barNumber, specialization } = req.body;
 
     // Check if email exists
     const existingUser = await Admin.findOne({ where: { email } });
@@ -173,7 +152,7 @@ exports.createAdvocate = async (req, res, next) => {
       phone,
       password: hashedPassword,
       role: 'advocate',
-      status
+      status: 'active'
     });
 
     // Create advocate profile
@@ -183,18 +162,16 @@ exports.createAdvocate = async (req, res, next) => {
       specialization
     });
 
-    // TODO: Send email with credentials
-
     res.status(201).json({
       id: admin.id.toString(),
       name: admin.name,
       email: admin.email,
-      phone: admin.phone,
+      phone: admin.phone || '',
       barNumber,
-      specialization,
+      specialization: specialization || '',
       status: admin.status,
       joinDate: admin.createdAt,
-      caseCount: 0
+      password // Include temporary password in response
     });
   } catch (error) {
     next(error);
@@ -206,8 +183,6 @@ exports.createAdvocate = async (req, res, next) => {
 // @access  Private/Super-Admin
 exports.updateAdvocate = async (req, res, next) => {
   try {
-    const { name, phone, barNumber, specialization, status } = req.body;
-
     const advocate = await Admin.findOne({
       where: {
         id: req.params.id,
@@ -225,28 +200,76 @@ exports.updateAdvocate = async (req, res, next) => {
       return next(new ErrorResponse(`Advocate not found with id of ${req.params.id}`, 404));
     }
 
+    const { name, email, phone, barNumber, specialization, status } = req.body;
+
+    // Check if email is being changed and already exists
+    if (email && email !== advocate.email) {
+      const existingUser = await Admin.findOne({ where: { email } });
+      if (existingUser) {
+        return next(new ErrorResponse('Email already in use', 400));
+      }
+    }
+
     // Update admin details
-    if (name) advocate.name = name;
-    if (phone) advocate.phone = phone;
-    if (status) advocate.status = status;
+    advocate.name = name || advocate.name;
+    advocate.email = email || advocate.email;
+    advocate.phone = phone || advocate.phone;
+    advocate.status = status || advocate.status;
     await advocate.save();
 
     // Update advocate details
-    if (barNumber) advocate.advocate.barNumber = barNumber;
-    if (specialization) advocate.advocate.specialization = specialization;
+    advocate.advocate.barNumber = barNumber || advocate.advocate.barNumber;
+    advocate.advocate.specialization = specialization || advocate.advocate.specialization;
     await advocate.advocate.save();
 
     res.status(200).json({
       id: advocate.id.toString(),
       name: advocate.name,
       email: advocate.email,
-      phone: advocate.phone,
+      phone: advocate.phone || '',
       barNumber: advocate.advocate.barNumber,
-      specialization: advocate.advocate.specialization,
+      specialization: advocate.advocate.specialization || '',
       status: advocate.status,
-      joinDate: advocate.createdAt,
-      caseCount: await Case.count({ where: { createdBy: advocate.id } })
+      joinDate: advocate.createdAt
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete advocate
+// @route   DELETE /api/advocates/:id
+// @access  Private/Super-Admin
+exports.deleteAdvocate = async (req, res, next) => {
+  try {
+    const advocate = await Admin.findOne({
+      where: {
+        id: req.params.id,
+        role: 'advocate'
+      },
+      include: [
+        {
+          model: Case,
+          as: 'cases',
+          required: false
+        }
+      ]
+    });
+
+    if (!advocate) {
+      return next(new ErrorResponse(`Advocate not found with id of ${req.params.id}`, 404));
+    }
+
+    // Check if advocate has any cases
+    if (advocate.cases.length > 0) {
+      return next(new ErrorResponse('Cannot delete advocate with active cases', 400));
+    }
+
+    // Delete advocate profile and admin user
+    await Advocate.destroy({ where: { adminId: advocate.id } });
+    await advocate.destroy();
+
+    res.status(200).end();
   } catch (error) {
     next(error);
   }
