@@ -13,7 +13,7 @@ exports.getCalendarData = async (req, res, next) => {
     
     // If not super-admin, only show own hearings
     if (req.user.role !== 'super-admin') {
-      caseQuery.createdBy = req.user.id;
+      caseQuery.advocateId = req.user.id;
     }
     
     // Filter by case if provided

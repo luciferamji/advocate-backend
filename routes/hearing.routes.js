@@ -24,7 +24,7 @@ router.route('/:id')
 
 // Public routes for comments
 router.route('/:id/comments')
-  .get(getHearingComments)
-  .post(createHearingComment);
+  .get(protect,getHearingComments)
+  .post(protect,createHearingComment);
 
 module.exports = router;
