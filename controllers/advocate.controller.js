@@ -73,7 +73,7 @@ exports.getAdvocates = async (req, res, next) => {
       }
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'ADVOCATE_LIST_ERROR'));
   }
 };
 
@@ -101,7 +101,7 @@ exports.getAdvocate = async (req, res, next) => {
     });
 
     if (!advocate) {
-      return next(new ErrorResponse(`Advocate not found with id of ${req.params.id}`, 404));
+      return next(new ErrorResponse('Advocate not found', 'ADVOCATE_NOT_FOUND', { id: req.params.id }));
     }
 
     res.status(200).json({
@@ -123,7 +123,7 @@ exports.getAdvocate = async (req, res, next) => {
       }))
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'ADVOCATE_FETCH_ERROR'));
   }
 };
 
@@ -137,7 +137,7 @@ exports.createAdvocate = async (req, res, next) => {
     // Check if email exists
     const existingUser = await Admin.findOne({ where: { email } });
     if (existingUser) {
-      return next(new ErrorResponse('Email already in use', 400));
+      return next(new ErrorResponse('Email already in use', 'EMAIL_EXISTS', { email }));
     }
 
     // Generate random password
@@ -174,7 +174,7 @@ exports.createAdvocate = async (req, res, next) => {
       password // Include temporary password in response
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'ADVOCATE_CREATE_ERROR'));
   }
 };
 
@@ -197,7 +197,7 @@ exports.updateAdvocate = async (req, res, next) => {
     });
 
     if (!advocate) {
-      return next(new ErrorResponse(`Advocate not found with id of ${req.params.id}`, 404));
+      return next(new ErrorResponse('Advocate not found', 'ADVOCATE_NOT_FOUND', { id: req.params.id }));
     }
 
     const { name, email, phone, barNumber, specialization, status } = req.body;
@@ -206,7 +206,7 @@ exports.updateAdvocate = async (req, res, next) => {
     if (email && email !== advocate.email) {
       const existingUser = await Admin.findOne({ where: { email } });
       if (existingUser) {
-        return next(new ErrorResponse('Email already in use', 400));
+        return next(new ErrorResponse('Email already in use', 'EMAIL_EXISTS', { email }));
       }
     }
 
@@ -233,7 +233,7 @@ exports.updateAdvocate = async (req, res, next) => {
       joinDate: advocate.createdAt
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'ADVOCATE_UPDATE_ERROR'));
   }
 };
 
@@ -257,12 +257,16 @@ exports.deleteAdvocate = async (req, res, next) => {
     });
 
     if (!advocate) {
-      return next(new ErrorResponse(`Advocate not found with id of ${req.params.id}`, 404));
+      return next(new ErrorResponse('Advocate not found', 'ADVOCATE_NOT_FOUND', { id: req.params.id }));
     }
 
     // Check if advocate has any cases
     if (advocate.cases.length > 0) {
-      return next(new ErrorResponse('Cannot delete advocate with active cases', 400));
+      return next(new ErrorResponse(
+        'Cannot delete advocate with active cases',
+        'ADVOCATE_HAS_CASES',
+        { caseCount: advocate.cases.length }
+      ));
     }
 
     // Delete advocate profile and admin user
@@ -271,6 +275,6 @@ exports.deleteAdvocate = async (req, res, next) => {
 
     res.status(200).end();
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'ADVOCATE_DELETE_ERROR'));
   }
 };
