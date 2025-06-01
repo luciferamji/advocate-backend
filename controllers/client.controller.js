@@ -2,6 +2,49 @@ const { Client, Case } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 
+// @desc    Search clients
+// @route   GET /api/clients/search
+// @access  Private
+exports.searchClients = async (req, res, next) => {
+  try {
+    const { search = '', limit = 10 } = req.query;
+
+    const whereClause = {
+      [Op.or]: [
+        { name: { [Op.iLike]: `%${search}%` } },
+        { clientId: { [Op.iLike]: `%${search}%` } }
+      ]
+    };
+
+    // If not super-admin, only show own clients
+    if (req.user.role !== 'super-admin') {
+      whereClause.createdBy = req.user.id;
+    }
+
+    const clients = await Client.findAll({
+      where: whereClause,
+      limit: parseInt(limit),
+      order: [['name', 'ASC']],
+      attributes: ['id', 'clientId', 'name', 'email', 'phone']
+    });
+
+    const formattedClients = clients.map(client => ({
+      id: client.id.toString(),
+      clientId: client.clientId,
+      name: client.name,
+      email: client.email || '',
+      phone: client.phone || ''
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: formattedClients
+    });
+  } catch (error) {
+    next(new ErrorResponse(error.message, 'CLIENT_SEARCH_ERROR'));
+  }
+};
+
 // @desc    Get all clients
 // @route   GET /api/clients
 // @access  Private
