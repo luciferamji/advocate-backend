@@ -19,11 +19,26 @@ module.exports = (sequelize, DataTypes) => {
     },
     createdBy: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
       references: {
         model: 'admin',
         key: 'id'
       }
+    },
+    clientName: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    clientEmail: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      validate: {
+        isEmail: true
+      }
+    },
+    clientPhone: {
+      type: DataTypes.STRING,
+      allowNull: true
     }
   }, {
     timestamps: true,

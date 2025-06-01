@@ -89,6 +89,16 @@ db.HearingComment.belongsTo(db.Hearing, {
   as: 'hearing'
 });
 
+// Admin - HearingComment relationship (1:Many)
+db.Admin.hasMany(db.HearingComment, {
+  foreignKey: 'createdBy',
+  as: 'hearingComments'
+});
+db.HearingComment.belongsTo(db.Admin, {
+  foreignKey: 'createdBy',
+  as: 'user'
+});
+
 // HearingComment - HearingCommentDoc relationship (1:Many)
 db.HearingComment.hasMany(db.HearingCommentDoc, {
   foreignKey: 'hearingCommentId',

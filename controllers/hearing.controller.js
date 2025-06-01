@@ -1,6 +1,7 @@
-const { Hearing, Case, Client } = require('../models');
+const { Hearing, Case, Client, Admin, HearingComment, HearingCommentDoc } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
+const { upload } = require('../utils/fileUpload');
 
 // @desc    Get all hearings
 // @route   GET /api/hearings
@@ -289,5 +290,176 @@ exports.deleteHearing = async (req, res, next) => {
     res.status(200).end();
   } catch (error) {
     next(new ErrorResponse(error.message, 'HEARING_DELETE_ERROR'));
+  }
+};
+
+// @desc    Get hearing comments
+// @route   GET /api/hearings/:id/comments
+// @access  Public
+exports.getHearingComments = async (req, res, next) => {
+  try {
+    const {
+      page = 0,
+      limit = 10
+    } = req.query;
+
+    const comments = await HearingComment.findAndCountAll({
+      where: { hearingId: req.params.id },
+      include: [
+        {
+          model: Admin,
+          as: 'user',
+          attributes: ['id', 'name'],
+          required: false
+        },
+        {
+          model: HearingCommentDoc,
+          as: 'documents',
+          attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
+        }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(page) * parseInt(limit)
+    });
+
+    const formattedComments = comments.rows.map(comment => ({
+      id: comment.id.toString(),
+      content: comment.text,
+      createdAt: comment.createdAt,
+      // If it's an admin comment, include admin details
+      ...(comment.user ? {
+        userId: comment.user.id.toString(),
+        userName: comment.user.name,
+        isAdmin: true
+      } : {
+        // If it's a client comment, include client details
+        clientName: comment.clientName,
+        clientEmail: comment.clientEmail,
+        clientPhone: comment.clientPhone,
+        isAdmin: false
+      }),
+      documents: comment.documents.map(doc => ({
+        id: doc.id.toString(),
+        fileName: doc.fileName,
+        fileSize: doc.fileSize,
+        fileType: doc.fileType,
+        url: `/uploads/${doc.filePath}`
+      }))
+    }));
+
+    res.status(200).json({
+      comments: formattedComments,
+      total: comments.count,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
+  } catch (error) {
+    next(new ErrorResponse(error.message, 'COMMENT_LIST_ERROR'));
+  }
+};
+
+// @desc    Create hearing comment
+// @route   POST /api/hearings/:id/comments
+// @access  Public
+exports.createHearingComment = async (req, res, next) => {
+  try {
+    const { content, clientName, clientEmail, clientPhone } = req.body;
+
+    // Validate the hearing exists
+    const hearing = await Hearing.findByPk(req.params.id);
+    if (!hearing) {
+      return next(new ErrorResponse('Hearing not found', 'HEARING_NOT_FOUND'));
+    }
+
+    // Create comment with appropriate fields based on user type
+    const commentData = {
+      hearingId: req.params.id,
+      text: content
+    };
+
+    // If authenticated user (admin/advocate)
+    if (req.user) {
+      commentData.createdBy = req.user.id;
+    } else {
+      // If client (unauthenticated)
+      if (!clientName || !clientEmail) {
+        return next(new ErrorResponse(
+          'Please provide name and email for client comment',
+          'VALIDATION_ERROR',
+          { required: ['clientName', 'clientEmail'] }
+        ));
+      }
+      commentData.clientName = clientName;
+      commentData.clientEmail = clientEmail;
+      commentData.clientPhone = clientPhone;
+    }
+
+    const comment = await HearingComment.create(commentData);
+
+    // Handle file uploads if present
+    if (req.files && req.files.length > 0) {
+      const uploadHandler = upload.array('documents', 10);
+      uploadHandler(req, res, async (err) => {
+        if (err) {
+          return next(new ErrorResponse('Problem with file upload', 'FILE_UPLOAD_ERROR'));
+        }
+
+        // Create document records
+        await Promise.all(req.files.map(file =>
+          HearingCommentDoc.create({
+            hearingCommentId: comment.id,
+            filePath: file.filename,
+            fileName: file.originalname,
+            fileType: file.mimetype,
+            fileSize: file.size
+          })
+        ));
+      });
+    }
+
+    // Fetch the created comment with all associations
+    const newComment = await HearingComment.findByPk(comment.id, {
+      include: [
+        {
+          model: Admin,
+          as: 'user',
+          attributes: ['id', 'name'],
+          required: false
+        },
+        {
+          model: HearingCommentDoc,
+          as: 'documents',
+          attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
+        }
+      ]
+    });
+
+    res.status(201).json({
+      id: newComment.id.toString(),
+      content: newComment.text,
+      createdAt: newComment.createdAt,
+      // If it's an admin comment, include admin details
+      ...(newComment.user ? {
+        userId: newComment.user.id.toString(),
+        userName: newComment.user.name,
+        isAdmin: true
+      } : {
+        // If it's a client comment, include client details
+        clientName: newComment.clientName,
+        clientEmail: newComment.clientEmail,
+        clientPhone: newComment.clientPhone,
+        isAdmin: false
+      }),
+      documents: newComment.documents.map(doc => ({
+        id: doc.id.toString(),
+        fileName: doc.fileName,
+        fileSize: doc.fileSize,
+        fileType: doc.fileType,
+        url: `/uploads/${doc.filePath}`
+      }))
+    });
+  } catch (error) {
+    next(new ErrorResponse(error.message, 'COMMENT_CREATE_ERROR'));
   }
 };
