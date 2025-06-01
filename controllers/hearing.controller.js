@@ -82,7 +82,7 @@ exports.getHearings = async (req, res, next) => {
       }
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'HEARING_LIST_ERROR'));
   }
 };
 
@@ -108,12 +108,12 @@ exports.getHearing = async (req, res, next) => {
     });
 
     if (!hearing) {
-      return next(new ErrorResponse(`Hearing not found with id of ${req.params.id}`, 404));
+      return next(new ErrorResponse('Hearing not found', 'HEARING_NOT_FOUND', { id: req.params.id }));
     }
 
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && hearing.case.advocateId !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to access this hearing', 403));
+      return next(new ErrorResponse('Not authorized to access this hearing', 'UNAUTHORIZED_ACCESS'));
     }
 
     res.status(200).json({
@@ -132,7 +132,7 @@ exports.getHearing = async (req, res, next) => {
       notes: hearing.notes
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'HEARING_FETCH_ERROR'));
   }
 };
 
@@ -153,6 +153,14 @@ exports.createHearing = async (req, res, next) => {
       notes
     } = req.body;
 
+    if (!caseId || !date || !time || !courtName) {
+      return next(new ErrorResponse(
+        'Please provide all required fields',
+        'VALIDATION_ERROR',
+        { required: ['caseId', 'date', 'time', 'courtName'] }
+      ));
+    }
+
     // Check if case exists and user has access
     const caseItem = await Case.findByPk(caseId, {
       include: [
@@ -165,12 +173,12 @@ exports.createHearing = async (req, res, next) => {
     });
 
     if (!caseItem) {
-      return next(new ErrorResponse('Case not found', 404));
+      return next(new ErrorResponse('Case not found', 'CASE_NOT_FOUND', { caseId }));
     }
 
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && caseItem.advocateId !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to create hearing for this case', 403));
+      return next(new ErrorResponse('Not authorized to create hearing for this case', 'UNAUTHORIZED_ACCESS'));
     }
 
     const hearing = await Hearing.create({
@@ -201,7 +209,7 @@ exports.createHearing = async (req, res, next) => {
       notes: hearing.notes
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'HEARING_CREATE_ERROR'));
   }
 };
 
@@ -227,12 +235,12 @@ exports.updateHearing = async (req, res, next) => {
     });
 
     if (!hearing) {
-      return next(new ErrorResponse(`Hearing not found with id of ${req.params.id}`, 404));
+      return next(new ErrorResponse('Hearing not found', 'HEARING_NOT_FOUND', { id: req.params.id }));
     }
 
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && hearing.case.advocateId !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to update this hearing', 403));
+      return next(new ErrorResponse('Not authorized to update this hearing', 'UNAUTHORIZED_ACCESS'));
     }
 
     // Update hearing
@@ -254,7 +262,7 @@ exports.updateHearing = async (req, res, next) => {
       notes: hearing.notes
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'HEARING_UPDATE_ERROR'));
   }
 };
 
@@ -268,18 +276,18 @@ exports.deleteHearing = async (req, res, next) => {
     });
 
     if (!hearing) {
-      return next(new ErrorResponse(`Hearing not found with id of ${req.params.id}`, 404));
+      return next(new ErrorResponse('Hearing not found', 'HEARING_NOT_FOUND', { id: req.params.id }));
     }
 
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && hearing.case.advocateId !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to delete this hearing', 403));
+      return next(new ErrorResponse('Not authorized to delete this hearing', 'UNAUTHORIZED_ACCESS'));
     }
 
     await hearing.destroy();
 
     res.status(200).end();
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'HEARING_DELETE_ERROR'));
   }
 };
