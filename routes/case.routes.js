@@ -12,18 +12,17 @@ const { protect } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
-// Apply middleware to all routes
-router.use(protect);
-
+// Protected routes
 router.route('/')
-  .get(getCases)
-  .post(createCase);
+  .get(protect, getCases)
+  .post(protect, createCase);
 
 router.route('/:id')
-  .get(getCase)
-  .put(updateCase)
-  .delete(deleteCase);
+  .get(protect, getCase)
+  .put(protect, updateCase)
+  .delete(protect, deleteCase);
 
+// Public routes for comments
 router.route('/:id/comments')
   .get(getCaseComments)
   .post(createCaseComment);
