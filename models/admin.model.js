@@ -25,6 +25,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.ENUM('super-admin', 'advocate'),
       allowNull: false,
       defaultValue: 'advocate'
+    },
+    sessionId: {
+      type: DataTypes.STRING,
+      allowNull: true
     }
   }, {
     timestamps: true,

@@ -47,8 +47,8 @@ exports.register = async (req, res, next) => {
 // @access  Public
 exports.login = async (req, res, next) => {
   try {
-    
     const { email, password } = req.body;
+    
     // Validate email & password
     if (!email || !password) {
       return next(new ErrorResponse('Please provide email and password', 400));
@@ -77,9 +77,15 @@ exports.login = async (req, res, next) => {
 // @desc    Logout user / clear cookie
 // @route   GET /api/auth/logout
 // @access  Private
-exports.logout = (req, res, next) => {
+exports.logout = async (req, res, next) => {
   try {
-    res.cookie('jwt', 'none', {
+    // Clear session from database
+    await Admin.update(
+      { sessionId: null },
+      { where: { id: req.user.id } }
+    );
+
+    res.cookie('session', 'none', {
       expires: new Date(Date.now() + 10 * 1000),
       httpOnly: true
     });

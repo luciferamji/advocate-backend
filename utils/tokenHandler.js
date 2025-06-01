@@ -1,29 +1,26 @@
-const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
-// Generate JWT token
-exports.generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN
-  });
+// Generate session ID
+exports.generateSessionId = () => {
+  return crypto.randomBytes(32).toString('hex');
 };
 
-// Set token cookie
+// Set session cookie
 exports.sendTokenResponse = (user, statusCode, res) => {
-  // Create token
-  const token = this.generateToken(user.id);
+  // Create session ID
+  const sessionId = this.generateSessionId();
 
   // Cookie options
   const options = {
-    expires: new Date(
-      Date.now() + 24 * 60 * 60 * 1000
-    ),
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production'
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
   };
 
   res
     .status(statusCode)
-    .cookie('jwt', token, options)
+    .cookie('session', sessionId, options)
     .json({
       success: true,
       data: {
