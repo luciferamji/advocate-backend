@@ -1,8 +1,10 @@
 const express = require('express');
 const {
   getHearings,
+  getHearing,
   createHearing,
-  createHearingComment
+  updateHearing,
+  deleteHearing
 } = require('../controllers/hearing.controller');
 const { protect } = require('../middleware/auth.middleware');
 
@@ -15,6 +17,9 @@ router.route('/')
   .get(getHearings)
   .post(createHearing);
 
-router.post('/:id/comments', createHearingComment);
+router.route('/:id')
+  .get(getHearing)
+  .put(updateHearing)
+  .delete(deleteHearing);
 
 module.exports = router;
