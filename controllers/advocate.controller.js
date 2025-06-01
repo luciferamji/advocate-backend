@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const { Admin, Advocate, Case } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
+const { sendEmail, emailTemplates } = require('../utils/email');
 
 // @desc    Get all advocates
 // @route   GET /api/advocates
@@ -134,14 +135,25 @@ exports.createAdvocate = async (req, res, next) => {
   try {
     const { name, email, phone, barNumber, specialization } = req.body;
 
+    if (!name || !email || !barNumber) {
+      return next(new ErrorResponse(
+        'Please provide all required fields',
+        'VALIDATION_ERROR',
+        { required: ['name', 'email', 'barNumber'] }
+      ));
+    }
+
     // Check if email exists
     const existingUser = await Admin.findOne({ where: { email } });
     if (existingUser) {
       return next(new ErrorResponse('Email already in use', 'EMAIL_EXISTS', { email }));
     }
 
-    // Generate random password
-    const password = Math.random().toString(36).slice(-8);
+    // Generate strong random password
+    const password = Math.random().toString(36).substring(2, 10) + 
+                    Math.random().toString(36).substring(2, 10) +
+                    '@' + Math.floor(Math.random() * 100);
+    
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -162,6 +174,19 @@ exports.createAdvocate = async (req, res, next) => {
       specialization
     });
 
+    // Send welcome email with credentials
+    try {
+      const emailTemplate = emailTemplates.advocateWelcome(name, email, password);
+      await sendEmail({
+        email,
+        subject: emailTemplate.subject,
+        html: emailTemplate.html
+      });
+    } catch (emailError) {
+      // Log email error but don't stop the response
+      console.error('Failed to send welcome email:', emailError);
+    }
+
     res.status(201).json({
       id: admin.id.toString(),
       name: admin.name,
@@ -170,8 +195,7 @@ exports.createAdvocate = async (req, res, next) => {
       barNumber,
       specialization: specialization || '',
       status: admin.status,
-      joinDate: admin.createdAt,
-      password // Include temporary password in response
+      joinDate: admin.createdAt
     });
   } catch (error) {
     next(new ErrorResponse(error.message, 'ADVOCATE_CREATE_ERROR'));
