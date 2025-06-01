@@ -1,14 +1,14 @@
 const crypto = require('crypto');
 
 // Generate session ID
-exports.generateSessionId = () => {
+const generateSessionId = () => {
   return crypto.randomBytes(32).toString('hex');
 };
 
-// Set session cookie
-exports.sendTokenResponse = (user, statusCode, res) => {
+// Set session cookie and return sessionId
+const sendTokenResponse = async (user, statusCode, res) => {
   // Create session ID
-  const sessionId = this.generateSessionId();
+  const sessionId = generateSessionId();
 
   // Cookie options
   const options = {
@@ -18,18 +18,28 @@ exports.sendTokenResponse = (user, statusCode, res) => {
     sameSite: 'strict'
   };
 
+  // Prepare user response
+  const userResponse = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    phone: user.phone,
+    advocate: user.advocate ? {
+      barNumber: user.advocate.barNumber,
+      specialization: user.advocate.specialization
+    } : undefined
+  };
+
   res
     .status(statusCode)
     .cookie('session', sessionId, options)
-    .json({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role
-        }
-      }
-    });
+    .json(userResponse);
+
+  return sessionId;
+};
+
+module.exports = {
+  generateSessionId,
+  sendTokenResponse
 };
