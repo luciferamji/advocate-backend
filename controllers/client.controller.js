@@ -1,33 +1,70 @@
-const { Client, Admin, Case } = require('../models');
+const { Client, Case } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
+const { Op } = require('sequelize');
 
 // @desc    Get all clients
 // @route   GET /api/clients
 // @access  Private
 exports.getClients = async (req, res, next) => {
   try {
-    let query = {};
-    
+    const {
+      page = 0,
+      limit = 10,
+      search = ''
+    } = req.query;
+
+    const whereClause = {};
+
     // If not super-admin, only show own clients
     if (req.user.role !== 'super-admin') {
-      query.createdBy = req.user.id;
+      whereClause.createdBy = req.user.id;
     }
-    
-    const clients = await Client.findAll({
-      where: query,
+
+    // Add search condition
+    if (search) {
+      whereClause[Op.or] = [
+        { name: { [Op.iLike]: `%${search}%` } },
+        { email: { [Op.iLike]: `%${search}%` } },
+        { clientId: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    const { count, rows } = await Client.findAndCountAll({
+      where: whereClause,
       include: [
         {
-          model: Admin,
-          as: 'admin',
-          attributes: ['id', 'name', 'email']
+          model: Case,
+          as: 'cases',
+          required: false
         }
-      ]
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(page) * parseInt(limit),
+      distinct: true
     });
-    
+
+    const totalPages = Math.ceil(count / parseInt(limit));
+
+    const clients = rows.map(client => ({
+      id: client.id.toString(),
+      name: client.name,
+      clientId: client.clientId,
+      email: client.email || '',
+      phone: client.phone || '',
+      address: client.address || '',
+      caseCount: client.cases?.length || 0,
+      createdAt: client.createdAt
+    }));
+
     res.status(200).json({
-      success: true,
-      count: clients.length,
-      data: clients
+      clients,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages
+      }
     });
   } catch (error) {
     next(error);
@@ -42,30 +79,40 @@ exports.getClient = async (req, res, next) => {
     const client = await Client.findByPk(req.params.id, {
       include: [
         {
-          model: Admin,
-          as: 'admin',
-          attributes: ['id', 'name', 'email']
-        },
-        {
           model: Case,
-          as: 'cases'
+          as: 'cases',
+          attributes: ['id', 'caseNumber', 'title', 'status', 'createdAt']
         }
       ]
     });
-    
+
     if (!client) {
       return next(new ErrorResponse(`Client not found with id of ${req.params.id}`, 404));
     }
-    
+
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && client.createdBy !== req.user.id) {
       return next(new ErrorResponse('Not authorized to access this client', 403));
     }
-    
-    res.status(200).json({
-      success: true,
-      data: client
-    });
+
+    const formattedClient = {
+      id: client.id.toString(),
+      name: client.name,
+      clientId: client.clientId,
+      email: client.email || '',
+      phone: client.phone || '',
+      address: client.address || '',
+      cases: client.cases.map(caseItem => ({
+        id: caseItem.id.toString(),
+        caseNumber: caseItem.caseNumber,
+        title: caseItem.title,
+        status: caseItem.status,
+        createdAt: caseItem.createdAt
+      })),
+      createdAt: client.createdAt
+    };
+
+    res.status(200).json(formattedClient);
   } catch (error) {
     next(error);
   }
@@ -76,23 +123,29 @@ exports.getClient = async (req, res, next) => {
 // @access  Private
 exports.createClient = async (req, res, next) => {
   try {
-    // Add user to req.body
-    req.body.createdBy = req.user.id;
-    
-    // Check if client ID already exists
-    const existingClient = await Client.findOne({
-      where: { clientId: req.body.clientId }
+    const { name, email, phone, address } = req.body;
+
+    // Generate unique client ID
+    const clientId = `CL${Date.now().toString().slice(-6)}`;
+
+    const client = await Client.create({
+      name,
+      clientId,
+      email,
+      phone,
+      address,
+      createdBy: req.user.id
     });
-    
-    if (existingClient) {
-      return next(new ErrorResponse('Client ID already exists', 400));
-    }
-    
-    const client = await Client.create(req.body);
-    
+
     res.status(201).json({
-      success: true,
-      data: client
+      id: client.id.toString(),
+      name: client.name,
+      clientId: client.clientId,
+      email: client.email || '',
+      phone: client.phone || '',
+      address: client.address || '',
+      caseCount: 0,
+      createdAt: client.createdAt
     });
   } catch (error) {
     next(error);
@@ -104,34 +157,37 @@ exports.createClient = async (req, res, next) => {
 // @access  Private
 exports.updateClient = async (req, res, next) => {
   try {
-    let client = await Client.findByPk(req.params.id);
-    
+    let client = await Client.findByPk(req.params.id, {
+      include: [
+        {
+          model: Case,
+          as: 'cases',
+          required: false
+        }
+      ]
+    });
+
     if (!client) {
       return next(new ErrorResponse(`Client not found with id of ${req.params.id}`, 404));
     }
-    
+
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && client.createdBy !== req.user.id) {
       return next(new ErrorResponse('Not authorized to update this client', 403));
     }
-    
-    // Check if updating clientId and if it already exists
-    if (req.body.clientId && req.body.clientId !== client.clientId) {
-      const existingClient = await Client.findOne({
-        where: { clientId: req.body.clientId }
-      });
-      
-      if (existingClient) {
-        return next(new ErrorResponse('Client ID already exists', 400));
-      }
-    }
-    
+
     // Update client
     client = await client.update(req.body);
-    
+
     res.status(200).json({
-      success: true,
-      data: client
+      id: client.id.toString(),
+      name: client.name,
+      clientId: client.clientId,
+      email: client.email || '',
+      phone: client.phone || '',
+      address: client.address || '',
+      caseCount: client.cases?.length || 0,
+      createdAt: client.createdAt
     });
   } catch (error) {
     next(error);
@@ -143,30 +199,33 @@ exports.updateClient = async (req, res, next) => {
 // @access  Private
 exports.deleteClient = async (req, res, next) => {
   try {
-    const client = await Client.findByPk(req.params.id);
-    
+    const client = await Client.findByPk(req.params.id, {
+      include: [
+        {
+          model: Case,
+          as: 'cases',
+          required: false
+        }
+      ]
+    });
+
     if (!client) {
       return next(new ErrorResponse(`Client not found with id of ${req.params.id}`, 404));
     }
-    
+
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && client.createdBy !== req.user.id) {
       return next(new ErrorResponse('Not authorized to delete this client', 403));
     }
-    
+
     // Check if client has cases
-    const cases = await Case.count({ where: { clientId: client.id } });
-    
-    if (cases > 0) {
+    if (client.cases?.length > 0) {
       return next(new ErrorResponse('Cannot delete client with associated cases', 400));
     }
-    
+
     await client.destroy();
-    
-    res.status(200).json({
-      success: true,
-      data: {}
-    });
+
+    res.status(200).end();
   } catch (error) {
     next(error);
   }
