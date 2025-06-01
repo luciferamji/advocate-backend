@@ -109,6 +109,16 @@ db.CaseComment.belongsTo(db.Case, {
   as: 'case'
 });
 
+// Admin - CaseComment relationship (1:Many)
+db.Admin.hasMany(db.CaseComment, {
+  foreignKey: 'createdBy',
+  as: 'caseComments'
+});
+db.CaseComment.belongsTo(db.Admin, {
+  foreignKey: 'createdBy',
+  as: 'user'
+});
+
 // CaseComment - CaseCommentDoc relationship (1:Many)
 db.CaseComment.hasMany(db.CaseCommentDoc, {
   foreignKey: 'caseCommentId',
