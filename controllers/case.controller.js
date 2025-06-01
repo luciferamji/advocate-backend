@@ -74,7 +74,7 @@ exports.getCases = async (req, res, next) => {
       }
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'CASE_LIST_ERROR'));
   }
 };
 
@@ -94,12 +94,12 @@ exports.getCase = async (req, res, next) => {
     });
 
     if (!caseItem) {
-      return next(new ErrorResponse(`Case not found with id of ${req.params.id}`, 404));
+      return next(new ErrorResponse('Case not found', 'CASE_NOT_FOUND', { id: req.params.id }));
     }
 
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to access this case', 403));
+      return next(new ErrorResponse('Not authorized to access this case', 'UNAUTHORIZED_ACCESS'));
     }
 
     res.status(200).json({
@@ -116,7 +116,7 @@ exports.getCase = async (req, res, next) => {
       updatedAt: caseItem.updatedAt
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'CASE_FETCH_ERROR'));
   }
 };
 
@@ -138,7 +138,7 @@ exports.createCase = async (req, res, next) => {
     // Check if case number exists
     const existingCase = await Case.findOne({ where: { caseNumber } });
     if (existingCase) {
-      return next(new ErrorResponse('Case number already exists', 400));
+      return next(new ErrorResponse('Case number already exists', 'CASE_NUMBER_EXISTS', { caseNumber }));
     }
 
     const caseItem = await Case.create({
@@ -176,7 +176,7 @@ exports.createCase = async (req, res, next) => {
       updatedAt: newCase.updatedAt
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'CASE_CREATE_ERROR'));
   }
 };
 
@@ -196,12 +196,12 @@ exports.updateCase = async (req, res, next) => {
     });
 
     if (!caseItem) {
-      return next(new ErrorResponse(`Case not found with id of ${req.params.id}`, 404));
+      return next(new ErrorResponse('Case not found', 'CASE_NOT_FOUND', { id: req.params.id }));
     }
 
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to update this case', 403));
+      return next(new ErrorResponse('Not authorized to update this case', 'UNAUTHORIZED_ACCESS'));
     }
 
     // Update case
@@ -221,7 +221,7 @@ exports.updateCase = async (req, res, next) => {
       updatedAt: caseItem.updatedAt
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'CASE_UPDATE_ERROR'));
   }
 };
 
@@ -233,19 +233,19 @@ exports.deleteCase = async (req, res, next) => {
     const caseItem = await Case.findByPk(req.params.id);
 
     if (!caseItem) {
-      return next(new ErrorResponse(`Case not found with id of ${req.params.id}`, 404));
+      return next(new ErrorResponse('Case not found', 'CASE_NOT_FOUND', { id: req.params.id }));
     }
 
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to delete this case', 403));
+      return next(new ErrorResponse('Not authorized to delete this case', 'UNAUTHORIZED_ACCESS'));
     }
 
     await caseItem.destroy();
 
     res.status(200).end();
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'CASE_DELETE_ERROR'));
   }
 };
 
@@ -300,7 +300,7 @@ exports.getCaseComments = async (req, res, next) => {
       limit: parseInt(limit)
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'COMMENT_LIST_ERROR'));
   }
 };
 
@@ -313,7 +313,7 @@ exports.createCaseComment = async (req, res, next) => {
 
     uploadHandler(req, res, async (err) => {
       if (err) {
-        return next(new ErrorResponse(`Problem with file upload: ${err.message}`, 400));
+        return next(new ErrorResponse(`Problem with file upload: ${err.message}`, 'FILE_UPLOAD_ERROR'));
       }
 
       const comment = await CaseComment.create({
@@ -365,6 +365,6 @@ exports.createCaseComment = async (req, res, next) => {
       });
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'COMMENT_CREATE_ERROR'));
   }
 };
