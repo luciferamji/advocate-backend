@@ -67,7 +67,7 @@ exports.getClients = async (req, res, next) => {
       }
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'CLIENT_LIST_ERROR'));
   }
 };
 
@@ -87,12 +87,12 @@ exports.getClient = async (req, res, next) => {
     });
 
     if (!client) {
-      return next(new ErrorResponse(`Client not found with id of ${req.params.id}`, 404));
+      return next(new ErrorResponse('Client not found', 'CLIENT_NOT_FOUND', { id: req.params.id }));
     }
 
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && client.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to access this client', 403));
+      return next(new ErrorResponse('Not authorized to access this client', 'UNAUTHORIZED_ACCESS'));
     }
 
     const formattedClient = {
@@ -114,7 +114,7 @@ exports.getClient = async (req, res, next) => {
 
     res.status(200).json(formattedClient);
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'CLIENT_FETCH_ERROR'));
   }
 };
 
@@ -124,6 +124,10 @@ exports.getClient = async (req, res, next) => {
 exports.createClient = async (req, res, next) => {
   try {
     const { name, email, phone, address } = req.body;
+
+    if (!name) {
+      return next(new ErrorResponse('Name is required', 'VALIDATION_ERROR'));
+    }
 
     // Generate unique client ID
     const clientId = `CL${Date.now().toString().slice(-6)}`;
@@ -148,7 +152,7 @@ exports.createClient = async (req, res, next) => {
       createdAt: client.createdAt
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'CLIENT_CREATE_ERROR'));
   }
 };
 
@@ -168,12 +172,12 @@ exports.updateClient = async (req, res, next) => {
     });
 
     if (!client) {
-      return next(new ErrorResponse(`Client not found with id of ${req.params.id}`, 404));
+      return next(new ErrorResponse('Client not found', 'CLIENT_NOT_FOUND', { id: req.params.id }));
     }
 
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && client.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to update this client', 403));
+      return next(new ErrorResponse('Not authorized to update this client', 'UNAUTHORIZED_ACCESS'));
     }
 
     // Update client
@@ -190,7 +194,7 @@ exports.updateClient = async (req, res, next) => {
       createdAt: client.createdAt
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'CLIENT_UPDATE_ERROR'));
   }
 };
 
@@ -210,23 +214,27 @@ exports.deleteClient = async (req, res, next) => {
     });
 
     if (!client) {
-      return next(new ErrorResponse(`Client not found with id of ${req.params.id}`, 404));
+      return next(new ErrorResponse('Client not found', 'CLIENT_NOT_FOUND', { id: req.params.id }));
     }
 
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && client.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to delete this client', 403));
+      return next(new ErrorResponse('Not authorized to delete this client', 'UNAUTHORIZED_ACCESS'));
     }
 
     // Check if client has cases
     if (client.cases?.length > 0) {
-      return next(new ErrorResponse('Cannot delete client with associated cases', 400));
+      return next(new ErrorResponse(
+        'Cannot delete client with associated cases',
+        'CLIENT_HAS_CASES',
+        { caseCount: client.cases.length }
+      ));
     }
 
     await client.destroy();
 
     res.status(200).end();
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'CLIENT_DELETE_ERROR'));
   }
 };
