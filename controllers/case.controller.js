@@ -323,7 +323,7 @@ exports.getCaseComments = async (req, res, next) => {
         fileName: doc.fileName,
         fileSize: doc.fileSize,
         fileType: doc.fileType,
-        url: `/uploads/cases/${doc.filePath}`
+        url: `/uploads/${doc.filePath}`
       }))
     }));
 
@@ -343,11 +343,11 @@ exports.getCaseComments = async (req, res, next) => {
 // @access  Public
 exports.createCaseComment = async (req, res, next) => {
   try {
-    const uploadHandler = upload.array('attachments', 10);
+    const uploadHandler = upload.array('documents', 10);
 
     uploadHandler(req, res, async (err) => {
       if (err) {
-        return next(new ErrorResponse(`Problem with file upload: ${err.message}`, 'FILE_UPLOAD_ERROR'));
+        return next(new ErrorResponse('Problem with file upload', 'FILE_UPLOAD_ERROR'));
       }
 
       const { content, clientName, clientEmail, clientPhone } = req.body;
@@ -434,7 +434,7 @@ exports.createCaseComment = async (req, res, next) => {
           fileName: doc.fileName,
           fileSize: doc.fileSize,
           fileType: doc.fileType,
-          url: `/uploads/cases/${doc.filePath}`
+          url: `/uploads/${doc.filePath}`
         }))
       });
     });
