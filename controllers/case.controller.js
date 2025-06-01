@@ -13,80 +13,107 @@ exports.getCases = async (req, res, next) => {
       limit = 10,
       search = '',
       status = '',
-      clientId = '',
-      advocateId = '',
-      startDate = '',
-      endDate = '',
-      sortBy = 'createdAt',
-      sortOrder = 'desc'
+      clientId = ''
     } = req.query;
 
     const whereClause = {};
 
     if (status) whereClause.status = status;
     if (clientId) whereClause.clientId = clientId;
-    if (advocateId) whereClause.advocateId = advocateId;
 
     if (search) {
       whereClause[Op.or] = [
         { caseNumber: { [Op.iLike]: `%${search}%` } },
-        { title: { [Op.iLike]: `%${search}%` } },
-        { courtName: { [Op.iLike]: `%${search}%` } }
+        { title: { [Op.iLike]: `%${search}%` } }
       ];
-    }
-
-    if (startDate && endDate) {
-      whereClause.createdAt = {
-        [Op.between]: [new Date(startDate), new Date(endDate)]
-      };
     }
 
     // If not super-admin, only show own cases
     if (req.user.role !== 'super-admin') {
-      whereClause.advocateId = req.user.id;
+      whereClause.createdBy = req.user.id;
     }
 
-    const cases = await Case.findAndCountAll({
+    const { count, rows } = await Case.findAndCountAll({
       where: whereClause,
       include: [
         {
           model: Client,
           as: 'client',
           attributes: ['id', 'name']
-        },
-        {
-          model: Admin,
-          as: 'advocate',
-          attributes: ['id', 'name']
         }
       ],
-      order: [[sortBy, sortOrder.toUpperCase()]],
+      order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
       offset: parseInt(page) * parseInt(limit),
       distinct: true
     });
 
-    const formattedCases = cases.rows.map(caseItem => ({
+    const totalPages = Math.ceil(count / parseInt(limit));
+
+    const cases = rows.map(caseItem => ({
       id: caseItem.id.toString(),
       caseNumber: caseItem.caseNumber,
       title: caseItem.title,
+      description: caseItem.description,
       clientId: caseItem.client.id.toString(),
       clientName: caseItem.client.name,
-      advocateId: caseItem.advocate.id.toString(),
-      advocateName: caseItem.advocate.name,
       courtName: caseItem.courtName,
       status: caseItem.status,
       nextHearing: caseItem.nextHearing,
-      description: caseItem.description,
       createdAt: caseItem.createdAt,
       updatedAt: caseItem.updatedAt
     }));
 
     res.status(200).json({
-      cases: formattedCases,
-      total: cases.count,
-      page: parseInt(page),
-      limit: parseInt(limit)
+      cases,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get single case
+// @route   GET /api/cases/:id
+// @access  Private
+exports.getCase = async (req, res, next) => {
+  try {
+    const caseItem = await Case.findByPk(req.params.id, {
+      include: [
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'name']
+        }
+      ]
+    });
+
+    if (!caseItem) {
+      return next(new ErrorResponse(`Case not found with id of ${req.params.id}`, 404));
+    }
+
+    // Check ownership if not super-admin
+    if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
+      return next(new ErrorResponse('Not authorized to access this case', 403));
+    }
+
+    res.status(200).json({
+      id: caseItem.id.toString(),
+      caseNumber: caseItem.caseNumber,
+      title: caseItem.title,
+      description: caseItem.description,
+      clientId: caseItem.client.id.toString(),
+      clientName: caseItem.client.name,
+      courtName: caseItem.courtName,
+      status: caseItem.status,
+      nextHearing: caseItem.nextHearing,
+      createdAt: caseItem.createdAt,
+      updatedAt: caseItem.updatedAt
     });
   } catch (error) {
     next(error);
@@ -100,26 +127,29 @@ exports.createCase = async (req, res, next) => {
   try {
     const {
       title,
-      clientId,
-      advocateId,
-      courtName,
+      caseNumber,
       description,
+      clientId,
+      courtName,
       status,
       nextHearing
     } = req.body;
 
-    // Generate case number
-    const caseNumber = `CASE-${Date.now()}`;
+    // Check if case number exists
+    const existingCase = await Case.findOne({ where: { caseNumber } });
+    if (existingCase) {
+      return next(new ErrorResponse('Case number already exists', 400));
+    }
 
     const caseItem = await Case.create({
-      caseNumber,
       title,
-      clientId,
-      advocateId,
-      courtName,
+      caseNumber,
       description,
+      clientId,
+      courtName,
       status,
-      nextHearing
+      nextHearing,
+      createdBy: req.user.id
     });
 
     const newCase = await Case.findByPk(caseItem.id, {
@@ -127,11 +157,6 @@ exports.createCase = async (req, res, next) => {
         {
           model: Client,
           as: 'client',
-          attributes: ['id', 'name']
-        },
-        {
-          model: Admin,
-          as: 'advocate',
           attributes: ['id', 'name']
         }
       ]
@@ -141,17 +166,84 @@ exports.createCase = async (req, res, next) => {
       id: newCase.id.toString(),
       caseNumber: newCase.caseNumber,
       title: newCase.title,
+      description: newCase.description,
       clientId: newCase.client.id.toString(),
       clientName: newCase.client.name,
-      advocateId: newCase.advocate.id.toString(),
-      advocateName: newCase.advocate.name,
       courtName: newCase.courtName,
       status: newCase.status,
       nextHearing: newCase.nextHearing,
-      description: newCase.description,
       createdAt: newCase.createdAt,
       updatedAt: newCase.updatedAt
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update case
+// @route   PUT /api/cases/:id
+// @access  Private
+exports.updateCase = async (req, res, next) => {
+  try {
+    let caseItem = await Case.findByPk(req.params.id, {
+      include: [
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'name']
+        }
+      ]
+    });
+
+    if (!caseItem) {
+      return next(new ErrorResponse(`Case not found with id of ${req.params.id}`, 404));
+    }
+
+    // Check ownership if not super-admin
+    if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
+      return next(new ErrorResponse('Not authorized to update this case', 403));
+    }
+
+    // Update case
+    caseItem = await caseItem.update(req.body);
+
+    res.status(200).json({
+      id: caseItem.id.toString(),
+      caseNumber: caseItem.caseNumber,
+      title: caseItem.title,
+      description: caseItem.description,
+      clientId: caseItem.client.id.toString(),
+      clientName: caseItem.client.name,
+      courtName: caseItem.courtName,
+      status: caseItem.status,
+      nextHearing: caseItem.nextHearing,
+      createdAt: caseItem.createdAt,
+      updatedAt: caseItem.updatedAt
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete case
+// @route   DELETE /api/cases/:id
+// @access  Private
+exports.deleteCase = async (req, res, next) => {
+  try {
+    const caseItem = await Case.findByPk(req.params.id);
+
+    if (!caseItem) {
+      return next(new ErrorResponse(`Case not found with id of ${req.params.id}`, 404));
+    }
+
+    // Check ownership if not super-admin
+    if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
+      return next(new ErrorResponse('Not authorized to delete this case', 403));
+    }
+
+    await caseItem.destroy();
+
+    res.status(200).end();
   } catch (error) {
     next(error);
   }
