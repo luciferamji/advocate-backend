@@ -293,7 +293,7 @@ exports.getCaseComments = async (req, res, next) => {
         },
         {
           model: CaseCommentDoc,
-          as: 'attachments',
+          as: 'documents',
           attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
         }
       ],
@@ -318,7 +318,7 @@ exports.getCaseComments = async (req, res, next) => {
         clientPhone: comment.clientPhone,
         isAdmin: false
       }),
-      attachments: comment.attachments.map(doc => ({
+      documents: comment.documents.map(doc => ({
         id: doc.id.toString(),
         fileName: doc.fileName,
         fileSize: doc.fileSize,
@@ -407,7 +407,7 @@ exports.createCaseComment = async (req, res, next) => {
           },
           {
             model: CaseCommentDoc,
-            as: 'attachments',
+            as: 'documents',
             attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
           }
         ]
@@ -429,7 +429,7 @@ exports.createCaseComment = async (req, res, next) => {
           clientPhone: newComment.clientPhone,
           isAdmin: false
         }),
-        attachments: newComment.attachments.map(doc => ({
+        documents: newComment.documents.map(doc => ({
           id: doc.id.toString(),
           fileName: doc.fileName,
           fileSize: doc.fileSize,
