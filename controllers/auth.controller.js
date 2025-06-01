@@ -12,7 +12,7 @@ exports.login = async (req, res, next) => {
     
     // Validate email & password
     if (!email || !password) {
-      return next(new ErrorResponse('Please provide email and password', 400));
+      return next(new ErrorResponse('Please provide email and password', 'INVALID_CREDENTIALS'));
     }
     
     // Check for user
@@ -25,14 +25,14 @@ exports.login = async (req, res, next) => {
     });
     
     if (!user) {
-      return next(new ErrorResponse('Invalid credentials', 401));
+      return next(new ErrorResponse('Invalid credentials', 'INVALID_CREDENTIALS'));
     }
     
     // Check if password matches
     const isMatch = await bcrypt.compare(password, user.password);
     
     if (!isMatch) {
-      return next(new ErrorResponse('Invalid credentials', 401));
+      return next(new ErrorResponse('Invalid credentials', 'INVALID_CREDENTIALS'));
     }
     
     // Generate session and send response
@@ -41,7 +41,7 @@ exports.login = async (req, res, next) => {
     // Update user's sessionId in database
     await user.update({ sessionId });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'AUTH_ERROR'));
   }
 };
 
@@ -65,7 +65,7 @@ exports.logout = async (req, res, next) => {
     
     res.status(200).end();
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'LOGOUT_ERROR'));
   }
 };
 
@@ -82,6 +82,10 @@ exports.getMe = async (req, res, next) => {
       }]
     });
     
+    if (!user) {
+      return next(new ErrorResponse('User not found', 'USER_NOT_FOUND'));
+    }
+    
     res.status(200).json({
       id: user.id.toString(),
       name: user.name,
@@ -94,7 +98,7 @@ exports.getMe = async (req, res, next) => {
       } : undefined
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'PROFILE_FETCH_ERROR'));
   }
 };
 
@@ -111,6 +115,10 @@ exports.updateDetails = async (req, res, next) => {
         required: false
       }]
     });
+    
+    if (!user) {
+      return next(new ErrorResponse('User not found', 'USER_NOT_FOUND'));
+    }
     
     // Update basic details
     user.name = name || user.name;
@@ -155,7 +163,7 @@ exports.updateDetails = async (req, res, next) => {
       } : undefined
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'PROFILE_UPDATE_ERROR'));
   }
 };
 
@@ -166,13 +174,21 @@ exports.updatePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
     
+    if (!currentPassword || !newPassword) {
+      return next(new ErrorResponse('Please provide both current and new password', 'INVALID_PASSWORD_DATA'));
+    }
+    
     const user = await Admin.findByPk(req.user.id);
+    
+    if (!user) {
+      return next(new ErrorResponse('User not found', 'USER_NOT_FOUND'));
+    }
     
     // Check current password
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     
     if (!isMatch) {
-      return next(new ErrorResponse('Current password is incorrect', 401));
+      return next(new ErrorResponse('Current password is incorrect', 'INVALID_CURRENT_PASSWORD'));
     }
     
     // Hash new password
@@ -193,6 +209,6 @@ exports.updatePassword = async (req, res, next) => {
       } : undefined
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'PASSWORD_UPDATE_ERROR'));
   }
 };
