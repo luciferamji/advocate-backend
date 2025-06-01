@@ -42,11 +42,19 @@ app.use('/api/dashboard', require('./routes/dashboard.routes'));
 // Error handler middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(err.statusCode || 500).json({
-    success: false,
-    message: err.message || 'Internal Server Error',
-    error: process.env.NODE_ENV === 'development' ? err : {}
-  });
+  
+  const errorResponse = {
+    error: {
+      message: err.message || 'Internal Server Error',
+      code: err.code || 'INTERNAL_ERROR'
+    }
+  };
+
+  if (err.details) {
+    errorResponse.error.details = err.details;
+  }
+
+  res.status(err.statusCode || 500).json(errorResponse);
 });
 
 // Start server
