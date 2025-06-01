@@ -1,17 +1,24 @@
 const express = require('express');
-const { getAdvocates, getAdvocate, updateAdvocate } = require('../controllers/advocate.controller');
+const { 
+  getAdvocates, 
+  getAdvocate, 
+  createAdvocate, 
+  updateAdvocate 
+} = require('../controllers/advocate.controller');
 const { protect, authorize } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
 // Apply middleware to all routes
 router.use(protect);
+router.use(authorize('super-admin'));
 
-// Routes that need super-admin
-router.get('/', authorize('super-admin'), getAdvocates);
-router.get('/:id', authorize('super-admin'), getAdvocate);
+router.route('/')
+  .get(getAdvocates)
+  .post(createAdvocate);
 
-// Routes that need either super-admin or ownership
-router.put('/:id', updateAdvocate);
+router.route('/:id')
+  .get(getAdvocate)
+  .put(updateAdvocate);
 
 module.exports = router;

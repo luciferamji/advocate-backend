@@ -30,6 +30,10 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: 'advocate'
     },
+    status: {
+      type: DataTypes.ENUM('active', 'inactive'),
+      defaultValue: 'active'
+    },
     sessionId: {
       type: DataTypes.STRING,
       allowNull: true
