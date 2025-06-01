@@ -300,7 +300,9 @@ exports.getHearingComments = async (req, res, next) => {
   try {
     const {
       page = 0,
-      limit = 10
+      limit = 10,
+      sortBy = 'createdAt',
+      order = 'desc'
     } = req.query;
 
     const comments = await HearingComment.findAndCountAll({
@@ -318,7 +320,7 @@ exports.getHearingComments = async (req, res, next) => {
           attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
         }
       ],
-      order: [['createdAt', 'DESC']],
+      order: [[sortBy, order.toUpperCase()]],
       limit: parseInt(limit),
       offset: parseInt(page) * parseInt(limit)
     });
@@ -336,7 +338,7 @@ exports.getHearingComments = async (req, res, next) => {
         // If it's a client comment, include client details
         clientName: comment.clientName,
         clientEmail: comment.clientEmail,
-        clientPhone: comment.clientPhone,
+        clientPhone: comment.clientPhone || '',
         isAdmin: false
       }),
       documents: comment.documents.map(doc => ({
@@ -350,9 +352,12 @@ exports.getHearingComments = async (req, res, next) => {
 
     res.status(200).json({
       comments: formattedComments,
-      total: comments.count,
-      page: parseInt(page),
-      limit: parseInt(limit)
+      pagination: {
+        total: comments.count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(comments.count / parseInt(limit))
+      }
     });
   } catch (error) {
     next(new ErrorResponse(error.message, 'COMMENT_LIST_ERROR'));
@@ -448,7 +453,7 @@ exports.createHearingComment = async (req, res, next) => {
         // If it's a client comment, include client details
         clientName: newComment.clientName,
         clientEmail: newComment.clientEmail,
-        clientPhone: newComment.clientPhone,
+        clientPhone: newComment.clientPhone || '',
         isAdmin: false
       }),
       documents: newComment.documents.map(doc => ({
