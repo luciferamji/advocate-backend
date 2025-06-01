@@ -46,7 +46,7 @@ exports.login = async (req, res, next) => {
 };
 
 // @desc    Logout user / clear cookie
-// @route   GET /api/auth/logout
+// @route   POST /api/auth/logout
 // @access  Private
 exports.logout = async (req, res, next) => {
   try {
@@ -63,9 +63,7 @@ exports.logout = async (req, res, next) => {
       sameSite: 'strict'
     });
     
-    res.status(200).json({
-      success: true
-    });
+    res.status(200).end();
   } catch (error) {
     next(error);
   }
@@ -85,7 +83,7 @@ exports.getMe = async (req, res, next) => {
     });
     
     res.status(200).json({
-      id: user.id,
+      id: user.id.toString(),
       name: user.name,
       email: user.email,
       role: user.role,
@@ -146,7 +144,7 @@ exports.updateDetails = async (req, res, next) => {
     });
     
     res.status(200).json({
-      id: updatedUser.id,
+      id: updatedUser.id.toString(),
       name: updatedUser.name,
       email: updatedUser.email,
       role: updatedUser.role,
@@ -184,7 +182,15 @@ exports.updatePassword = async (req, res, next) => {
     await user.save();
     
     res.status(200).json({
-      success: true
+      id: user.id.toString(),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      advocate: user.advocate ? {
+        barNumber: user.advocate.barNumber,
+        specialization: user.advocate.specialization
+      } : undefined
     });
   } catch (error) {
     next(error);

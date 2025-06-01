@@ -20,7 +20,7 @@ const sendTokenResponse = async (user, statusCode, res) => {
 
   // Prepare user response
   const userResponse = {
-    id: user.id,
+    id: user.id.toString(),
     name: user.name,
     email: user.email,
     role: user.role,
