@@ -1,9 +1,9 @@
 module.exports = (sequelize, DataTypes) => {
   const Case = sequelize.define('case', {
     id: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       primaryKey: true,
-      autoIncrement: true
+      defaultValue: DataTypes.UUIDV4,
     },
     caseNumber: {
       type: DataTypes.STRING,
@@ -15,7 +15,7 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false
     },
     clientId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: false,
       references: {
         model: 'client',
@@ -23,7 +23,7 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     advocateId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: false,
       references: {
         model: 'admin',
