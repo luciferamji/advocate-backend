@@ -5,10 +5,14 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true,
       autoIncrement: true
     },
-    caseId: {
+    caseNumber: {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true
+    },
+    title: {
+      type: DataTypes.STRING,
+      allowNull: false
     },
     clientId: {
       type: DataTypes.INTEGER,
@@ -18,7 +22,7 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
-    createdBy: {
+    advocateId: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -26,17 +30,21 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
-    courtDetails: {
-      type: DataTypes.TEXT,
-      allowNull: true
+    courtName: {
+      type: DataTypes.STRING,
+      allowNull: false
     },
-    remarks: {
+    description: {
       type: DataTypes.TEXT,
       allowNull: true
     },
     status: {
-      type: DataTypes.ENUM('active', 'closed', 'pending'),
-      defaultValue: 'active'
+      type: DataTypes.ENUM('OPEN', 'PENDING', 'CLOSED'),
+      defaultValue: 'OPEN'
+    },
+    nextHearing: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   }, {
     timestamps: true,

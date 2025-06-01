@@ -1,102 +1,92 @@
-const { Case, Client, Admin, Hearing, CaseComment, CaseCommentDoc } = require('../models');
+const { Case, Client, Admin, CaseComment, CaseCommentDoc } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
-const { upload, handleChunkedUpload } = require('../utils/fileUpload');
+const { Op } = require('sequelize');
+const { upload } = require('../utils/fileUpload');
 
 // @desc    Get all cases
 // @route   GET /api/cases
 // @access  Private
 exports.getCases = async (req, res, next) => {
   try {
-    let query = {};
-    
+    const {
+      page = 0,
+      limit = 10,
+      search = '',
+      status = '',
+      clientId = '',
+      advocateId = '',
+      startDate = '',
+      endDate = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    const whereClause = {};
+
+    if (status) whereClause.status = status;
+    if (clientId) whereClause.clientId = clientId;
+    if (advocateId) whereClause.advocateId = advocateId;
+
+    if (search) {
+      whereClause[Op.or] = [
+        { caseNumber: { [Op.iLike]: `%${search}%` } },
+        { title: { [Op.iLike]: `%${search}%` } },
+        { courtName: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    if (startDate && endDate) {
+      whereClause.createdAt = {
+        [Op.between]: [new Date(startDate), new Date(endDate)]
+      };
+    }
+
     // If not super-admin, only show own cases
     if (req.user.role !== 'super-admin') {
-      query.createdBy = req.user.id;
+      whereClause.advocateId = req.user.id;
     }
-    
-    // Filter by client if provided
-    if (req.query.clientId) {
-      query.clientId = req.query.clientId;
-    }
-    
-    // Filter by status if provided
-    if (req.query.status) {
-      query.status = req.query.status;
-    }
-    
-    const cases = await Case.findAll({
-      where: query,
-      include: [
-        {
-          model: Client,
-          as: 'client',
-          attributes: ['id', 'name', 'clientId', 'email', 'phone']
-        },
-        {
-          model: Admin,
-          as: 'admin',
-          attributes: ['id', 'name', 'email']
-        }
-      ]
-    });
-    
-    res.status(200).json({
-      success: true,
-      count: cases.length,
-      data: cases
-    });
-  } catch (error) {
-    next(error);
-  }
-};
 
-// @desc    Get single case
-// @route   GET /api/cases/:id
-// @access  Private
-exports.getCase = async (req, res, next) => {
-  try {
-    const caseItem = await Case.findByPk(req.params.id, {
+    const cases = await Case.findAndCountAll({
+      where: whereClause,
       include: [
         {
           model: Client,
           as: 'client',
-          attributes: ['id', 'name', 'clientId', 'email', 'phone']
+          attributes: ['id', 'name']
         },
         {
           model: Admin,
-          as: 'admin',
-          attributes: ['id', 'name', 'email']
-        },
-        {
-          model: Hearing,
-          as: 'hearings'
-        },
-        {
-          model: CaseComment,
-          as: 'comments',
-          include: [
-            {
-              model: CaseCommentDoc,
-              as: 'documents',
-              attributes: ['id', 'fileName', 'fileSize', 'fileType']
-            }
-          ]
+          as: 'advocate',
+          attributes: ['id', 'name']
         }
-      ]
+      ],
+      order: [[sortBy, sortOrder.toUpperCase()]],
+      limit: parseInt(limit),
+      offset: parseInt(page) * parseInt(limit),
+      distinct: true
     });
-    
-    if (!caseItem) {
-      return next(new ErrorResponse(`Case not found with id of ${req.params.id}`, 404));
-    }
-    
-    // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to access this case', 403));
-    }
-    
+
+    const formattedCases = cases.rows.map(caseItem => ({
+      id: caseItem.id.toString(),
+      caseNumber: caseItem.caseNumber,
+      title: caseItem.title,
+      clientId: caseItem.client.id.toString(),
+      clientName: caseItem.client.name,
+      advocateId: caseItem.advocate.id.toString(),
+      advocateName: caseItem.advocate.name,
+      courtName: caseItem.courtName,
+      status: caseItem.status,
+      nextHearing: caseItem.nextHearing,
+      description: caseItem.description,
+      createdAt: caseItem.createdAt,
+      updatedAt: caseItem.updatedAt
+    }));
+
     res.status(200).json({
-      success: true,
-      data: caseItem
+      cases: formattedCases,
+      total: cases.count,
+      page: parseInt(page),
+      limit: parseInt(limit)
     });
   } catch (error) {
     next(error);
@@ -108,144 +98,143 @@ exports.getCase = async (req, res, next) => {
 // @access  Private
 exports.createCase = async (req, res, next) => {
   try {
-    // Add user to req.body
-    req.body.createdBy = req.user.id;
-    
-    // Check if client exists
-    const client = await Client.findByPk(req.body.clientId);
-    
-    if (!client) {
-      return next(new ErrorResponse(`Client not found with id of ${req.body.clientId}`, 404));
-    }
-    
-    // Check ownership of client if not super-admin
-    if (req.user.role !== 'super-admin' && client.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to create case for this client', 403));
-    }
-    
-    // Check if case ID already exists
-    const existingCase = await Case.findOne({
-      where: { caseId: req.body.caseId }
+    const {
+      title,
+      clientId,
+      advocateId,
+      courtName,
+      description,
+      status,
+      nextHearing
+    } = req.body;
+
+    // Generate case number
+    const caseNumber = `CASE-${Date.now()}`;
+
+    const caseItem = await Case.create({
+      caseNumber,
+      title,
+      clientId,
+      advocateId,
+      courtName,
+      description,
+      status,
+      nextHearing
     });
-    
-    if (existingCase) {
-      return next(new ErrorResponse('Case ID already exists', 400));
-    }
-    
-    const caseItem = await Case.create(req.body);
-    
+
+    const newCase = await Case.findByPk(caseItem.id, {
+      include: [
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'name']
+        },
+        {
+          model: Admin,
+          as: 'advocate',
+          attributes: ['id', 'name']
+        }
+      ]
+    });
+
     res.status(201).json({
-      success: true,
-      data: caseItem
+      id: newCase.id.toString(),
+      caseNumber: newCase.caseNumber,
+      title: newCase.title,
+      clientId: newCase.client.id.toString(),
+      clientName: newCase.client.name,
+      advocateId: newCase.advocate.id.toString(),
+      advocateName: newCase.advocate.name,
+      courtName: newCase.courtName,
+      status: newCase.status,
+      nextHearing: newCase.nextHearing,
+      description: newCase.description,
+      createdAt: newCase.createdAt,
+      updatedAt: newCase.updatedAt
     });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Update case
-// @route   PUT /api/cases/:id
+// @desc    Get case comments
+// @route   GET /api/cases/:id/comments
 // @access  Private
-exports.updateCase = async (req, res, next) => {
+exports.getCaseComments = async (req, res, next) => {
   try {
-    let caseItem = await Case.findByPk(req.params.id);
-    
-    if (!caseItem) {
-      return next(new ErrorResponse(`Case not found with id of ${req.params.id}`, 404));
-    }
-    
-    // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to update this case', 403));
-    }
-    
-    // Check if updating caseId and if it already exists
-    if (req.body.caseId && req.body.caseId !== caseItem.caseId) {
-      const existingCase = await Case.findOne({
-        where: { caseId: req.body.caseId }
-      });
-      
-      if (existingCase) {
-        return next(new ErrorResponse('Case ID already exists', 400));
-      }
-    }
-    
-    // Update case
-    caseItem = await caseItem.update(req.body);
-    
+    const {
+      page = 0,
+      limit = 10
+    } = req.query;
+
+    const comments = await CaseComment.findAndCountAll({
+      where: { caseId: req.params.id },
+      include: [
+        {
+          model: Admin,
+          as: 'user',
+          attributes: ['id', 'name']
+        },
+        {
+          model: CaseCommentDoc,
+          as: 'attachments',
+          attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
+        }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(page) * parseInt(limit)
+    });
+
+    const formattedComments = comments.rows.map(comment => ({
+      id: comment.id.toString(),
+      content: comment.text,
+      userId: comment.user.id.toString(),
+      userName: comment.user.name,
+      createdAt: comment.createdAt,
+      attachments: comment.attachments.map(doc => ({
+        id: doc.id.toString(),
+        fileName: doc.fileName,
+        fileSize: doc.fileSize,
+        fileType: doc.fileType,
+        url: `/uploads/cases/${doc.filePath}`
+      }))
+    }));
+
     res.status(200).json({
-      success: true,
-      data: caseItem
+      comments: formattedComments,
+      total: comments.count,
+      page: parseInt(page),
+      limit: parseInt(limit)
     });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Delete case
-// @route   DELETE /api/cases/:id
-// @access  Private
-exports.deleteCase = async (req, res, next) => {
-  try {
-    const caseItem = await Case.findByPk(req.params.id);
-    
-    if (!caseItem) {
-      return next(new ErrorResponse(`Case not found with id of ${req.params.id}`, 404));
-    }
-    
-    // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to delete this case', 403));
-    }
-    
-    await caseItem.destroy();
-    
-    res.status(200).json({
-      success: true,
-      data: {}
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Add comment to case with optional files
+// @desc    Create case comment
 // @route   POST /api/cases/:id/comments
 // @access  Private
-exports.addCaseComment = async (req, res, next) => {
+exports.createCaseComment = async (req, res, next) => {
   try {
-    const caseItem = await Case.findByPk(req.params.id);
-    
-    if (!caseItem) {
-      return next(new ErrorResponse(`Case not found with id of ${req.params.id}`, 404));
-    }
-    
-    // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to add comment to this case', 403));
-    }
-
-    // Handle file upload if present
-    const uploadHandler = upload.array('files', 10); // Allow up to 10 files
+    const uploadHandler = upload.array('attachments', 10);
 
     uploadHandler(req, res, async (err) => {
       if (err) {
         return next(new ErrorResponse(`Problem with file upload: ${err.message}`, 400));
       }
 
-      // Create comment
       const comment = await CaseComment.create({
-        caseId: caseItem.id,
-        text: req.body.text,
+        caseId: req.params.id,
+        text: req.body.content,
         createdBy: req.user.id
       });
 
-      // Handle uploaded files
       if (req.files && req.files.length > 0) {
-        const documents = await Promise.all(req.files.map(file => 
+        await Promise.all(req.files.map(file =>
           CaseCommentDoc.create({
             caseCommentId: comment.id,
-            filePath: file.path,
+            filePath: file.filename,
             fileName: file.originalname,
             fileType: file.mimetype,
             fileSize: file.size
@@ -253,86 +242,34 @@ exports.addCaseComment = async (req, res, next) => {
         ));
       }
 
-      // Fetch comment with documents
-      const commentWithDocs = await CaseComment.findByPk(comment.id, {
-        include: [{
-          model: CaseCommentDoc,
-          as: 'documents',
-          attributes: ['id', 'fileName', 'fileSize', 'fileType']
-        }]
-      });
-
-      res.status(201).json({
-        success: true,
-        data: commentWithDocs
-      });
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Upload document to case comment
-// @route   POST /api/cases/comments/:id/documents
-// @access  Private
-exports.uploadCaseCommentDocument = async (req, res, next) => {
-  try {
-    const comment = await CaseComment.findByPk(req.params.id, {
-      include: [{ model: Case, as: 'case' }]
-    });
-    
-    if (!comment) {
-      return next(new ErrorResponse(`Comment not found with id of ${req.params.id}`, 404));
-    }
-    
-    // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && comment.case.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to upload document to this comment', 403));
-    }
-    
-    // Handle chunked upload
-    const uploadHandler = upload.single('file');
-    uploadHandler(req, res, async (err) => {
-      if (err) {
-        return next(new ErrorResponse(`Problem with file upload: ${err.message}`, 400));
-      }
-      
-      if (!req.file && !req.finalFile) {
-        return next(new ErrorResponse('Please upload a file', 400));
-      }
-      
-      // Handle chunked upload
-      if (req.query.resumableChunkNumber) {
-        return handleChunkedUpload(req, res, async () => {
-          if (req.finalFile) {
-            const document = await CaseCommentDoc.create({
-              caseCommentId: comment.id,
-              filePath: req.finalFile.path,
-              fileName: req.finalFile.originalname,
-              fileType: req.finalFile.mimetype,
-              fileSize: req.finalFile.size
-            });
-            
-            res.status(201).json({
-              success: true,
-              data: document
-            });
+      const newComment = await CaseComment.findByPk(comment.id, {
+        include: [
+          {
+            model: Admin,
+            as: 'user',
+            attributes: ['id', 'name']
+          },
+          {
+            model: CaseCommentDoc,
+            as: 'attachments',
+            attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
           }
-        });
-      }
-      
-      // Handle regular upload
-      const document = await CaseCommentDoc.create({
-        caseCommentId: comment.id,
-        filePath: req.file.path,
-        fileName: req.file.originalname,
-        fileType: req.file.mimetype,
-        fileSize: req.file.size
+        ]
       });
-      
+
       res.status(201).json({
-        success: true,
-        data: document
+        id: newComment.id.toString(),
+        content: newComment.text,
+        userId: newComment.user.id.toString(),
+        userName: newComment.user.name,
+        createdAt: newComment.createdAt,
+        attachments: newComment.attachments.map(doc => ({
+          id: doc.id.toString(),
+          fileName: doc.fileName,
+          fileSize: doc.fileSize,
+          fileType: doc.fileType,
+          url: `/uploads/cases/${doc.filePath}`
+        }))
       });
     });
   } catch (error) {
