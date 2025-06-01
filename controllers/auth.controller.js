@@ -3,45 +3,6 @@ const { Admin, Advocate } = require('../models');
 const { sendTokenResponse } = require('../utils/tokenHandler');
 const ErrorResponse = require('../utils/errorHandler');
 
-// @desc    Register user
-// @route   POST /api/auth/register
-// @access  Public
-exports.register = async (req, res, next) => {
-  try {
-    const { name, email, password, role } = req.body;
-    
-    // Check if user exists
-    const existingUser = await Admin.findOne({ where: { email } });
-    
-    if (existingUser) {
-      return next(new ErrorResponse('Email already in use', 400));
-    }
-    
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    
-    // Create user
-    const user = await Admin.create({
-      name,
-      email,
-      password: hashedPassword,
-      role: 'advocate' // Default role for registration
-    });
-    
-    // Create advocate entry
-    if (user.role === 'advocate') {
-      await Advocate.create({
-        adminId: user.id
-      });
-    }
-    
-    sendTokenResponse(user, 201, res);
-  } catch (error) {
-    next(error);
-  }
-};
-
 // @desc    Login user
 // @route   POST /api/auth/login
 // @access  Public
@@ -55,7 +16,13 @@ exports.login = async (req, res, next) => {
     }
     
     // Check for user
-    const user = await Admin.findOne({ where: { email } });
+    const user = await Admin.findOne({
+      where: { email },
+      include: [{
+        model: Advocate,
+        attributes: ['barNumber', 'specialization']
+      }]
+    });
     
     if (!user) {
       return next(new ErrorResponse('Invalid credentials', 401));
@@ -68,7 +35,11 @@ exports.login = async (req, res, next) => {
       return next(new ErrorResponse('Invalid credentials', 401));
     }
     
-    sendTokenResponse(user, 200, res);
+    // Generate session and send response
+    const sessionId = await sendTokenResponse(user, 200, res);
+    
+    // Update user's sessionId in database
+    await user.update({ sessionId });
   } catch (error) {
     next(error);
   }
@@ -87,12 +58,13 @@ exports.logout = async (req, res, next) => {
 
     res.cookie('session', 'none', {
       expires: new Date(Date.now() + 10 * 1000),
-      httpOnly: true
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
     });
     
     res.status(200).json({
-      success: true,
-      data: {}
+      success: true
     });
   } catch (error) {
     next(error);
@@ -105,15 +77,23 @@ exports.logout = async (req, res, next) => {
 exports.getMe = async (req, res, next) => {
   try {
     const user = await Admin.findByPk(req.user.id, {
-      attributes: { exclude: ['password'] },
-      include: req.user.role === 'advocate' ? [
-        { model: Advocate }
-      ] : []
+      attributes: { exclude: ['password', 'sessionId'] },
+      include: [{
+        model: Advocate,
+        attributes: ['barNumber', 'specialization']
+      }]
     });
     
     res.status(200).json({
-      success: true,
-      data: user
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      advocate: user.advocate ? {
+        barNumber: user.advocate.barNumber,
+        specialization: user.advocate.specialization
+      } : undefined
     });
   } catch (error) {
     next(error);
@@ -121,37 +101,60 @@ exports.getMe = async (req, res, next) => {
 };
 
 // @desc    Update user details
-// @route   PUT /api/auth/updatedetails
+// @route   PUT /api/auth/update-details
 // @access  Private
 exports.updateDetails = async (req, res, next) => {
   try {
-    const { name, email } = req.body;
+    const { name, phone, barNumber, specialization } = req.body;
     
-    const user = await Admin.findByPk(req.user.id);
+    const user = await Admin.findByPk(req.user.id, {
+      include: [{
+        model: Advocate,
+        required: false
+      }]
+    });
     
-    if (email && email !== user.email) {
-      // Check if email is already in use
-      const existingUser = await Admin.findOne({ where: { email } });
-      
-      if (existingUser) {
-        return next(new ErrorResponse('Email already in use', 400));
+    // Update basic details
+    user.name = name || user.name;
+    user.phone = phone || user.phone;
+    
+    // Update advocate details if applicable
+    if (user.role === 'advocate' && (barNumber || specialization)) {
+      if (user.advocate) {
+        await user.advocate.update({
+          barNumber: barNumber || user.advocate.barNumber,
+          specialization: specialization || user.advocate.specialization
+        });
+      } else {
+        await Advocate.create({
+          adminId: user.id,
+          barNumber,
+          specialization
+        });
       }
     }
     
-    // Update user
-    user.name = name || user.name;
-    user.email = email || user.email;
-    
     await user.save();
     
+    // Fetch updated user
+    const updatedUser = await Admin.findByPk(user.id, {
+      attributes: { exclude: ['password', 'sessionId'] },
+      include: [{
+        model: Advocate,
+        attributes: ['barNumber', 'specialization']
+      }]
+    });
+    
     res.status(200).json({
-      success: true,
-      data: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      }
+      id: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      phone: updatedUser.phone,
+      advocate: updatedUser.advocate ? {
+        barNumber: updatedUser.advocate.barNumber,
+        specialization: updatedUser.advocate.specialization
+      } : undefined
     });
   } catch (error) {
     next(error);
@@ -159,20 +162,19 @@ exports.updateDetails = async (req, res, next) => {
 };
 
 // @desc    Update password
-// @route   PUT /api/auth/updatepassword
+// @route   PUT /api/auth/update-password
 // @access  Private
 exports.updatePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
     
-    // Check current password
     const user = await Admin.findByPk(req.user.id);
     
     // Check current password
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     
     if (!isMatch) {
-      return next(new ErrorResponse('Password is incorrect', 401));
+      return next(new ErrorResponse('Current password is incorrect', 401));
     }
     
     // Hash new password
@@ -181,7 +183,9 @@ exports.updatePassword = async (req, res, next) => {
     
     await user.save();
     
-    sendTokenResponse(user, 200, res);
+    res.status(200).json({
+      success: true
+    });
   } catch (error) {
     next(error);
   }
