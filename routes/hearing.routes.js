@@ -1,12 +1,8 @@
 const express = require('express');
-const { 
-  getHearings, 
-  getHearing, 
-  createHearing, 
-  updateHearing, 
-  deleteHearing,
-  addHearingComment,
-  uploadHearingCommentDocument
+const {
+  getHearings,
+  createHearing,
+  createHearingComment
 } = require('../controllers/hearing.controller');
 const { protect } = require('../middleware/auth.middleware');
 
@@ -19,12 +15,6 @@ router.route('/')
   .get(getHearings)
   .post(createHearing);
 
-router.route('/:id')
-  .get(getHearing)
-  .put(updateHearing)
-  .delete(deleteHearing);
-
-router.post('/:id/comments', addHearingComment);
-router.post('/comments/:id/documents', uploadHearingCommentDocument);
+router.post('/:id/comments', createHearingComment);
 
 module.exports = router;

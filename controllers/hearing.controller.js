@@ -1,97 +1,117 @@
-const { Hearing, Case, HearingComment, HearingCommentDoc } = require('../models');
+const { Hearing, Case, Client, Admin, HearingComment, HearingCommentDoc } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
-const { upload, handleChunkedUpload } = require('../utils/fileUpload');
 const { Op } = require('sequelize');
+const { upload } = require('../utils/fileUpload');
 
 // @desc    Get all hearings
 // @route   GET /api/hearings
 // @access  Private
 exports.getHearings = async (req, res, next) => {
   try {
-    let query = {};
-    
-    // Filter by case if provided
-    if (req.query.caseId) {
-      query.caseId = req.query.caseId;
+    const {
+      page = 0,
+      limit = 10,
+      caseId,
+      advocateId,
+      clientId,
+      startDate,
+      endDate,
+      status
+    } = req.query;
+
+    const whereClause = {};
+    const caseWhereClause = {};
+
+    if (caseId) whereClause.caseId = caseId;
+    if (status) whereClause.status = status;
+    if (advocateId) caseWhereClause.advocateId = advocateId;
+    if (clientId) caseWhereClause.clientId = clientId;
+
+    if (startDate && endDate) {
+      whereClause.date = {
+        [Op.between]: [startDate, endDate]
+      };
     }
-    
-    // Filter by date range if provided
-    if (req.query.startDate && req.query.endDate) {
-      query.hearingDate = {
-        [Op.between]: [
-          new Date(req.query.startDate),
-          new Date(req.query.endDate)
-        ]
-      };
-    } else if (req.query.startDate) {
-      query.hearingDate = {
-        [Op.gte]: new Date(req.query.startDate)
-      };
-    } else if (req.query.endDate) {
-      query.hearingDate = {
-        [Op.lte]: new Date(req.query.endDate)
-      };
+
+    // If not super-admin, only show hearings for own cases
+    if (req.user.role !== 'super-admin') {
+      caseWhereClause.advocateId = req.user.id;
     }
-    
-    const hearings = await Hearing.findAll({
-      where: query,
+
+    const hearings = await Hearing.findAndCountAll({
+      where: whereClause,
       include: [
         {
           model: Case,
           as: 'case',
-          where: req.user.role !== 'super-admin' ? { createdBy: req.user.id } : {},
-          required: true
-        }
-      ]
-    });
-    
-    res.status(200).json({
-      success: true,
-      count: hearings.length,
-      data: hearings
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Get single hearing
-// @route   GET /api/hearings/:id
-// @access  Private
-exports.getHearing = async (req, res, next) => {
-  try {
-    const hearing = await Hearing.findByPk(req.params.id, {
-      include: [
-        {
-          model: Case,
-          as: 'case'
+          where: caseWhereClause,
+          required: true,
+          include: [
+            {
+              model: Client,
+              as: 'client',
+              attributes: ['id', 'name']
+            }
+          ]
         },
         {
           model: HearingComment,
           as: 'comments',
           include: [
             {
+              model: Admin,
+              as: 'user',
+              attributes: ['id', 'name']
+            },
+            {
               model: HearingCommentDoc,
-              as: 'documents',
-              attributes: ['id', 'fileName', 'fileSize', 'fileType']
+              as: 'attachments',
+              attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
             }
           ]
         }
-      ]
+      ],
+      order: [['date', 'ASC'], ['time', 'ASC']],
+      limit: parseInt(limit),
+      offset: parseInt(page) * parseInt(limit),
+      distinct: true
     });
-    
-    if (!hearing) {
-      return next(new ErrorResponse(`Hearing not found with id of ${req.params.id}`, 404));
-    }
-    
-    // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && hearing.case.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to access this hearing', 403));
-    }
-    
+
+    const formattedHearings = hearings.rows.map(hearing => ({
+      id: hearing.id.toString(),
+      caseId: hearing.case.id.toString(),
+      caseName: hearing.case.title,
+      clientId: hearing.case.client.id.toString(),
+      clientName: hearing.case.client.name,
+      date: hearing.date,
+      time: hearing.time,
+      courtName: hearing.courtName,
+      purpose: hearing.purpose,
+      judge: hearing.judge,
+      room: hearing.room,
+      status: hearing.status,
+      notes: hearing.notes,
+      comments: hearing.comments.map(comment => ({
+        id: comment.id.toString(),
+        content: comment.text,
+        userId: comment.user.id.toString(),
+        userName: comment.user.name,
+        createdAt: comment.createdAt,
+        attachments: comment.attachments.map(doc => ({
+          id: doc.id.toString(),
+          fileName: doc.fileName,
+          fileSize: doc.fileSize,
+          fileType: doc.fileType,
+          url: `/uploads/hearings/${doc.filePath}`
+        }))
+      }))
+    }));
+
     res.status(200).json({
-      success: true,
-      data: hearing
+      hearings: formattedHearings,
+      total: hearings.count,
+      page: parseInt(page),
+      limit: parseInt(limit)
     });
   } catch (error) {
     next(error);
@@ -103,137 +123,113 @@ exports.getHearing = async (req, res, next) => {
 // @access  Private
 exports.createHearing = async (req, res, next) => {
   try {
-    // Check if case exists
-    const caseItem = await Case.findByPk(req.body.caseId);
-    
+    const {
+      caseId,
+      date,
+      time,
+      courtName,
+      purpose,
+      judge,
+      room,
+      status,
+      notes
+    } = req.body;
+
+    // Check if case exists and user has access
+    const caseItem = await Case.findByPk(caseId);
     if (!caseItem) {
-      return next(new ErrorResponse(`Case not found with id of ${req.body.caseId}`, 404));
+      return next(new ErrorResponse('Case not found', 404));
     }
-    
+
     // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
+    if (req.user.role !== 'super-admin' && caseItem.advocateId !== req.user.id) {
       return next(new ErrorResponse('Not authorized to create hearing for this case', 403));
     }
-    
-    const hearing = await Hearing.create(req.body);
-    
+
+    const hearing = await Hearing.create({
+      caseId,
+      date,
+      time,
+      courtName,
+      purpose,
+      judge,
+      room,
+      status,
+      notes
+    });
+
+    const newHearing = await Hearing.findByPk(hearing.id, {
+      include: [
+        {
+          model: Case,
+          as: 'case',
+          include: [
+            {
+              model: Client,
+              as: 'client',
+              attributes: ['id', 'name']
+            }
+          ]
+        }
+      ]
+    });
+
     res.status(201).json({
-      success: true,
-      data: hearing
+      id: newHearing.id.toString(),
+      caseId: newHearing.case.id.toString(),
+      caseName: newHearing.case.title,
+      clientId: newHearing.case.client.id.toString(),
+      clientName: newHearing.case.client.name,
+      date: newHearing.date,
+      time: newHearing.time,
+      courtName: newHearing.courtName,
+      purpose: newHearing.purpose,
+      judge: newHearing.judge,
+      room: newHearing.room,
+      status: newHearing.status,
+      notes: newHearing.notes
     });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Update hearing
-// @route   PUT /api/hearings/:id
-// @access  Private
-exports.updateHearing = async (req, res, next) => {
-  try {
-    let hearing = await Hearing.findByPk(req.params.id, {
-      include: [
-        {
-          model: Case,
-          as: 'case'
-        }
-      ]
-    });
-    
-    if (!hearing) {
-      return next(new ErrorResponse(`Hearing not found with id of ${req.params.id}`, 404));
-    }
-    
-    // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && hearing.case.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to update this hearing', 403));
-    }
-    
-    // Update hearing
-    hearing = await hearing.update(req.body);
-    
-    res.status(200).json({
-      success: true,
-      data: hearing
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Delete hearing
-// @route   DELETE /api/hearings/:id
-// @access  Private
-exports.deleteHearing = async (req, res, next) => {
-  try {
-    const hearing = await Hearing.findByPk(req.params.id, {
-      include: [
-        {
-          model: Case,
-          as: 'case'
-        }
-      ]
-    });
-    
-    if (!hearing) {
-      return next(new ErrorResponse(`Hearing not found with id of ${req.params.id}`, 404));
-    }
-    
-    // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && hearing.case.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to delete this hearing', 403));
-    }
-    
-    await hearing.destroy();
-    
-    res.status(200).json({
-      success: true,
-      data: {}
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Add comment to hearing with optional files
+// @desc    Create hearing comment
 // @route   POST /api/hearings/:id/comments
 // @access  Private
-exports.addHearingComment = async (req, res, next) => {
+exports.createHearingComment = async (req, res, next) => {
   try {
     const hearing = await Hearing.findByPk(req.params.id, {
       include: [{ model: Case, as: 'case' }]
     });
-    
+
     if (!hearing) {
-      return next(new ErrorResponse(`Hearing not found with id of ${req.params.id}`, 404));
-    }
-    
-    // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && hearing.case.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to add comment to this hearing', 403));
+      return next(new ErrorResponse('Hearing not found', 404));
     }
 
-    // Handle file upload if present
-    const uploadHandler = upload.array('files', 10); // Allow up to 10 files
+    // Check ownership if not super-admin
+    if (req.user.role !== 'super-admin' && hearing.case.advocateId !== req.user.id) {
+      return next(new ErrorResponse('Not authorized to comment on this hearing', 403));
+    }
+
+    const uploadHandler = upload.array('attachments', 10);
 
     uploadHandler(req, res, async (err) => {
       if (err) {
         return next(new ErrorResponse(`Problem with file upload: ${err.message}`, 400));
       }
 
-      // Create comment
       const comment = await HearingComment.create({
         hearingId: hearing.id,
-        text: req.body.text,
+        text: req.body.content,
         createdBy: req.user.id
       });
 
-      // Handle uploaded files
       if (req.files && req.files.length > 0) {
-        const documents = await Promise.all(req.files.map(file => 
+        await Promise.all(req.files.map(file =>
           HearingCommentDoc.create({
             hearingCommentId: comment.id,
-            filePath: file.path,
+            filePath: file.filename,
             fileName: file.originalname,
             fileType: file.mimetype,
             fileSize: file.size
@@ -241,90 +237,34 @@ exports.addHearingComment = async (req, res, next) => {
         ));
       }
 
-      // Fetch comment with documents
-      const commentWithDocs = await HearingComment.findByPk(comment.id, {
-        include: [{
-          model: HearingCommentDoc,
-          as: 'documents',
-          attributes: ['id', 'fileName', 'fileSize', 'fileType']
-        }]
-      });
-
-      res.status(201).json({
-        success: true,
-        data: commentWithDocs
-      });
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Upload document to hearing comment
-// @route   POST /api/hearings/comments/:id/documents
-// @access  Private
-exports.uploadHearingCommentDocument = async (req, res, next) => {
-  try {
-    const comment = await HearingComment.findByPk(req.params.id, {
-      include: [{
-        model: Hearing,
-        as: 'hearing',
-        include: [{ model: Case, as: 'case' }]
-      }]
-    });
-    
-    if (!comment) {
-      return next(new ErrorResponse(`Comment not found with id of ${req.params.id}`, 404));
-    }
-    
-    // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && comment.hearing.case.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to upload document to this comment', 403));
-    }
-    
-    // Handle chunked upload
-    const uploadHandler = upload.single('file');
-    uploadHandler(req, res, async (err) => {
-      if (err) {
-        return next(new ErrorResponse(`Problem with file upload: ${err.message}`, 400));
-      }
-      
-      if (!req.file && !req.finalFile) {
-        return next(new ErrorResponse('Please upload a file', 400));
-      }
-      
-      // Handle chunked upload
-      if (req.query.resumableChunkNumber) {
-        return handleChunkedUpload(req, res, async () => {
-          if (req.finalFile) {
-            const document = await HearingCommentDoc.create({
-              hearingCommentId: comment.id,
-              filePath: req.finalFile.path,
-              fileName: req.finalFile.originalname,
-              fileType: req.finalFile.mimetype,
-              fileSize: req.finalFile.size
-            });
-            
-            res.status(201).json({
-              success: true,
-              data: document
-            });
+      const newComment = await HearingComment.findByPk(comment.id, {
+        include: [
+          {
+            model: Admin,
+            as: 'user',
+            attributes: ['id', 'name']
+          },
+          {
+            model: HearingCommentDoc,
+            as: 'attachments',
+            attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
           }
-        });
-      }
-      
-      // Handle regular upload
-      const document = await HearingCommentDoc.create({
-        hearingCommentId: comment.id,
-        filePath: req.file.path,
-        fileName: req.file.originalname,
-        fileType: req.file.mimetype,
-        fileSize: req.file.size
+        ]
       });
-      
+
       res.status(201).json({
-        success: true,
-        data: document
+        id: newComment.id.toString(),
+        content: newComment.text,
+        userId: newComment.user.id.toString(),
+        userName: newComment.user.name,
+        createdAt: newComment.createdAt,
+        attachments: newComment.attachments.map(doc => ({
+          id: doc.id.toString(),
+          fileName: doc.fileName,
+          fileSize: doc.fileSize,
+          fileType: doc.fileType,
+          url: `/uploads/hearings/${doc.filePath}`
+        }))
       });
     });
   } catch (error) {

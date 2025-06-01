@@ -5,10 +5,6 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true,
       autoIncrement: true
     },
-    hearingDate: {
-      type: DataTypes.DATE,
-      allowNull: false
-    },
     caseId: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -17,13 +13,37 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
-    notes: {
-      type: DataTypes.TEXT,
+    date: {
+      type: DataTypes.DATEONLY,
+      allowNull: false
+    },
+    time: {
+      type: DataTypes.TIME,
+      allowNull: false
+    },
+    courtName: {
+      type: DataTypes.STRING,
+      allowNull: false
+    },
+    purpose: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    judge: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    room: {
+      type: DataTypes.STRING,
       allowNull: true
     },
     status: {
-      type: DataTypes.ENUM('scheduled', 'completed', 'postponed', 'cancelled'),
+      type: DataTypes.ENUM('scheduled', 'completed', 'cancelled'),
       defaultValue: 'scheduled'
+    },
+    notes: {
+      type: DataTypes.TEXT,
+      allowNull: true
     }
   }, {
     timestamps: true,
