@@ -343,48 +343,48 @@ exports.getCaseComments = async (req, res, next) => {
 // @access  Public
 exports.createCaseComment = async (req, res, next) => {
   try {
-    const uploadHandler = upload.array('documents', 10);
+    const { content, clientName, clientEmail, clientPhone } = req.body;
 
-    uploadHandler(req, res, async (err) => {
-      if (err) {
-        return next(new ErrorResponse('Problem with file upload', 'FILE_UPLOAD_ERROR'));
+    // Validate the case exists
+    const caseItem = await Case.findByPk(req.params.id);
+    if (!caseItem) {
+      return next(new ErrorResponse('Case not found', 'CASE_NOT_FOUND'));
+    }
+
+    // Create comment with appropriate fields based on user type
+    const commentData = {
+      caseId: req.params.id,
+      text: content
+    };
+
+    // If authenticated user (admin/advocate)
+    if (req.user) {
+      commentData.createdBy = req.user.id;
+    } else {
+      // If client (unauthenticated)
+      if (!clientName || !clientEmail) {
+        return next(new ErrorResponse(
+          'Please provide name and email for client comment',
+          'VALIDATION_ERROR',
+          { required: ['clientName', 'clientEmail'] }
+        ));
       }
+      commentData.clientName = clientName;
+      commentData.clientEmail = clientEmail;
+      commentData.clientPhone = clientPhone;
+    }
 
-      const { content, clientName, clientEmail, clientPhone } = req.body;
+    const comment = await CaseComment.create(commentData);
 
-      // Validate the case exists
-      const caseItem = await Case.findByPk(req.params.id);
-      if (!caseItem) {
-        return next(new ErrorResponse('Case not found', 'CASE_NOT_FOUND'));
-      }
-
-      // Create comment with appropriate fields based on user type
-      const commentData = {
-        caseId: req.params.id,
-        text: content
-      };
-
-      // If authenticated user (admin/advocate)
-      if (req.user) {
-        commentData.createdBy = req.user.id;
-      } else {
-        // If client (unauthenticated)
-        if (!clientName || !clientEmail) {
-          return next(new ErrorResponse(
-            'Please provide name and email for client comment',
-            'VALIDATION_ERROR',
-            { required: ['clientName', 'clientEmail'] }
-          ));
+    // Handle file uploads if present
+    if (req.files && req.files.length > 0) {
+      const uploadHandler = upload.array('documents', 10);
+      uploadHandler(req, res, async (err) => {
+        if (err) {
+          return next(new ErrorResponse('Problem with file upload', 'FILE_UPLOAD_ERROR'));
         }
-        commentData.clientName = clientName;
-        commentData.clientEmail = clientEmail;
-        commentData.clientPhone = clientPhone;
-      }
 
-      const comment = await CaseComment.create(commentData);
-
-      // Handle file attachments
-      if (req.files && req.files.length > 0) {
+        // Create document records
         await Promise.all(req.files.map(file =>
           CaseCommentDoc.create({
             caseCommentId: comment.id,
@@ -394,49 +394,49 @@ exports.createCaseComment = async (req, res, next) => {
             fileSize: file.size
           })
         ));
-      }
-
-      // Fetch the created comment with all associations
-      const newComment = await CaseComment.findByPk(comment.id, {
-        include: [
-          {
-            model: Admin,
-            as: 'user',
-            attributes: ['id', 'name'],
-            required: false
-          },
-          {
-            model: CaseCommentDoc,
-            as: 'documents',
-            attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
-          }
-        ]
       });
+    }
 
-      res.status(201).json({
-        id: newComment.id.toString(),
-        content: newComment.text,
-        createdAt: newComment.createdAt,
-        // If it's an admin comment, include admin details
-        ...(newComment.user ? {
-          userId: newComment.user.id.toString(),
-          userName: newComment.user.name,
-          isAdmin: true
-        } : {
-          // If it's a client comment, include client details
-          clientName: newComment.clientName,
-          clientEmail: newComment.clientEmail,
-          clientPhone: newComment.clientPhone,
-          isAdmin: false
-        }),
-        documents: newComment.documents.map(doc => ({
-          id: doc.id.toString(),
-          fileName: doc.fileName,
-          fileSize: doc.fileSize,
-          fileType: doc.fileType,
-          url: `/uploads/${doc.filePath}`
-        }))
-      });
+    // Fetch the created comment with all associations
+    const newComment = await CaseComment.findByPk(comment.id, {
+      include: [
+        {
+          model: Admin,
+          as: 'user',
+          attributes: ['id', 'name'],
+          required: false
+        },
+        {
+          model: CaseCommentDoc,
+          as: 'documents',
+          attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
+        }
+      ]
+    });
+
+    res.status(201).json({
+      id: newComment.id.toString(),
+      content: newComment.text,
+      createdAt: newComment.createdAt,
+      // If it's an admin comment, include admin details
+      ...(newComment.user ? {
+        userId: newComment.user.id.toString(),
+        userName: newComment.user.name,
+        isAdmin: true
+      } : {
+        // If it's a client comment, include client details
+        clientName: newComment.clientName,
+        clientEmail: newComment.clientEmail,
+        clientPhone: newComment.clientPhone,
+        isAdmin: false
+      }),
+      documents: newComment.documents.map(doc => ({
+        id: doc.id.toString(),
+        fileName: doc.fileName,
+        fileSize: doc.fileSize,
+        fileType: doc.fileType,
+        url: `/uploads/${doc.filePath}`
+      }))
     });
   } catch (error) {
     next(new ErrorResponse(error.message, 'COMMENT_CREATE_ERROR'));
