@@ -24,7 +24,7 @@ router.route('/:id')
 
 // Public routes for comments
 router.route('/:id/comments')
-  .get(getCaseComments)
-  .post(createCaseComment);
+  .get(protect,getCaseComments)
+  .post(protect,createCaseComment);
 
 module.exports = router;

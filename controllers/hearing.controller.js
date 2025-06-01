@@ -383,6 +383,7 @@ exports.createHearingComment = async (req, res, next) => {
       text: content
     };
 
+    console.log(req.user,"dadadadada");
     // If authenticated user (admin/advocate)
     if (req.user) {
       commentData.createdBy = req.user.id;
