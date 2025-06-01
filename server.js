@@ -36,6 +36,7 @@ app.use('/api/cases', require('./routes/case.routes'));
 app.use('/api/hearings', require('./routes/hearing.routes'));
 app.use('/api/calendar', require('./routes/calendar.routes'));
 app.use('/api/upload-links', require('./routes/uploadLink.routes'));
+app.use('/api/comments', require('./routes/comments.routes'));
 
 // Error handler middleware
 app.use((err, req, res, next) => {
