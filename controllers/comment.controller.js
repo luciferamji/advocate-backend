@@ -12,12 +12,12 @@ exports.updateComment = async (req, res, next) => {
     }
 
     if (!comment) {
-      return next(new ErrorResponse(`Comment not found with id of ${req.params.id}`, 404));
+      return next(new ErrorResponse('Comment not found', 'COMMENT_NOT_FOUND', { id: req.params.id }));
     }
 
     // Check ownership
     if (comment.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to update this comment', 403));
+      return next(new ErrorResponse('Not authorized to update this comment', 'UNAUTHORIZED_ACCESS'));
     }
 
     // Update comment
@@ -34,7 +34,7 @@ exports.updateComment = async (req, res, next) => {
       updatedAt: comment.updatedAt
     });
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'COMMENT_UPDATE_ERROR'));
   }
 };
 
@@ -49,18 +49,18 @@ exports.deleteComment = async (req, res, next) => {
     }
 
     if (!comment) {
-      return next(new ErrorResponse(`Comment not found with id of ${req.params.id}`, 404));
+      return next(new ErrorResponse('Comment not found', 'COMMENT_NOT_FOUND', { id: req.params.id }));
     }
 
     // Check ownership
     if (comment.createdBy !== req.user.id) {
-      return next(new ErrorResponse('Not authorized to delete this comment', 403));
+      return next(new ErrorResponse('Not authorized to delete this comment', 'UNAUTHORIZED_ACCESS'));
     }
 
     await comment.destroy();
 
     res.status(200).end();
   } catch (error) {
-    next(error);
+    next(new ErrorResponse(error.message, 'COMMENT_DELETE_ERROR'));
   }
 };
