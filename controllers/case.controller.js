@@ -128,12 +128,22 @@ exports.createCase = async (req, res, next) => {
     const {
       title,
       caseNumber,
-      description,
       clientId,
+      clientName,
       courtName,
       status,
+      description,
       nextHearing
     } = req.body;
+
+    // Validate required fields
+    if (!title || !caseNumber || !clientId || !courtName) {
+      return next(new ErrorResponse(
+        'Please provide all required fields',
+        'VALIDATION_ERROR',
+        { required: ['title', 'caseNumber', 'clientId', 'courtName'] }
+      ));
+    }
 
     // Check if case number exists
     const existingCase = await Case.findOne({ where: { caseNumber } });
@@ -141,39 +151,47 @@ exports.createCase = async (req, res, next) => {
       return next(new ErrorResponse('Case number already exists', 'CASE_NUMBER_EXISTS', { caseNumber }));
     }
 
+    // Check if client exists
+    const client = await Client.findByPk(clientId);
+    if (!client) {
+      return next(new ErrorResponse('Client not found', 'CLIENT_NOT_FOUND', { clientId }));
+    }
+
+    // Create case
     const caseItem = await Case.create({
       title,
       caseNumber,
-      description,
       clientId,
       courtName,
-      status,
-      nextHearing,
+      description,
+      status: status || 'OPEN',
+      nextHearing: nextHearing || null,
       createdBy: req.user.id
     });
 
+    // Fetch created case with client details
     const newCase = await Case.findByPk(caseItem.id, {
-      include: [
-        {
-          model: Client,
-          as: 'client',
-          attributes: ['id', 'name']
-        }
-      ]
+      include: [{
+        model: Client,
+        as: 'client',
+        attributes: ['id', 'name']
+      }]
     });
 
     res.status(201).json({
-      id: newCase.id.toString(),
-      caseNumber: newCase.caseNumber,
-      title: newCase.title,
-      description: newCase.description,
-      clientId: newCase.client.id.toString(),
-      clientName: newCase.client.name,
-      courtName: newCase.courtName,
-      status: newCase.status,
-      nextHearing: newCase.nextHearing,
-      createdAt: newCase.createdAt,
-      updatedAt: newCase.updatedAt
+      success: true,
+      data: {
+        id: newCase.id.toString(),
+        title: newCase.title,
+        caseNumber: newCase.caseNumber,
+        clientId: newCase.client.id.toString(),
+        clientName: newCase.client.name,
+        courtName: newCase.courtName,
+        status: newCase.status,
+        description: newCase.description || '',
+        nextHearing: newCase.nextHearing || null,
+        createdAt: newCase.createdAt
+      }
     });
   } catch (error) {
     next(new ErrorResponse(error.message, 'CASE_CREATE_ERROR'));
