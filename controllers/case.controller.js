@@ -30,7 +30,7 @@ exports.getCases = async (req, res, next) => {
 
     // If not super-admin, only show own cases
     if (req.user.role !== 'super-admin') {
-      whereClause.createdBy = req.user.id;
+      whereClause.advocateId = req.user.id;
     }
 
     const { count, rows } = await Case.findAndCountAll({
@@ -98,7 +98,7 @@ exports.getCase = async (req, res, next) => {
     }
 
     // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
+    if (req.user.role !== 'super-admin' && caseItem.advocateId !== req.user.id) {
       return next(new ErrorResponse('Not authorized to access this case', 'UNAUTHORIZED_ACCESS'));
     }
 
@@ -151,13 +151,18 @@ exports.createCase = async (req, res, next) => {
       return next(new ErrorResponse('Case number already exists', 'CASE_NUMBER_EXISTS', { caseNumber }));
     }
 
-    // Check if client exists
+    // Check if client exists and get the advocate ID
     const client = await Client.findByPk(clientId);
     if (!client) {
       return next(new ErrorResponse('Client not found', 'CLIENT_NOT_FOUND', { clientId }));
     }
 
-    // Create case
+    // Check if the user has access to this client
+    if (req.user.role !== 'super-admin' && client.createdBy !== req.user.id) {
+      return next(new ErrorResponse('Not authorized to create case for this client', 'UNAUTHORIZED_ACCESS'));
+    }
+
+    // Create case with advocate ID from client's creator
     const caseItem = await Case.create({
       title,
       caseNumber,
@@ -166,7 +171,7 @@ exports.createCase = async (req, res, next) => {
       description,
       status: status || 'OPEN',
       nextHearing: nextHearing || null,
-      createdBy: req.user.id
+      advocateId: client.createdBy // Set advocateId from client's creator
     });
 
     // Fetch created case with client details
@@ -218,7 +223,7 @@ exports.updateCase = async (req, res, next) => {
     }
 
     // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
+    if (req.user.role !== 'super-admin' && caseItem.advocateId !== req.user.id) {
       return next(new ErrorResponse('Not authorized to update this case', 'UNAUTHORIZED_ACCESS'));
     }
 
@@ -255,7 +260,7 @@ exports.deleteCase = async (req, res, next) => {
     }
 
     // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && caseItem.createdBy !== req.user.id) {
+    if (req.user.role !== 'super-admin' && caseItem.advocateId !== req.user.id) {
       return next(new ErrorResponse('Not authorized to delete this case', 'UNAUTHORIZED_ACCESS'));
     }
 
