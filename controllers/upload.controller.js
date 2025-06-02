@@ -5,8 +5,8 @@ const { v4: uuidv4 } = require('uuid');
 const ErrorResponse = require('../utils/errorHandler');
 const { upload } = require('../utils/fileUpload');
 
-const CHUNKS_DIR = path.join(process.env.UPLOAD_DIR || 'uploads', 'chunks');
-const UPLOADS_DIR = path.join(process.env.UPLOAD_DIR || 'uploads');
+const CHUNKS_DIR = path.join(process.env.UPLOAD_DIR || 'uploads', 'temp','chunks');
+const UPLOADS_DIR = path.join(process.env.UPLOAD_DIR || 'uploads','temp');
 
 // @desc    Check if chunk exists
 // @route   GET /api/upload/chunk
