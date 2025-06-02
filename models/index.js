@@ -102,7 +102,7 @@ db.HearingComment.belongsTo(db.Admin, {
 // HearingComment - HearingCommentDoc relationship (1:Many)
 db.HearingComment.hasMany(db.HearingCommentDoc, {
   foreignKey: 'hearingCommentId',
-  as: 'documents'
+  as: 'attachments'
 });
 db.HearingCommentDoc.belongsTo(db.HearingComment, {
   foreignKey: 'hearingCommentId',

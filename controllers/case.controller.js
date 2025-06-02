@@ -280,10 +280,19 @@ exports.getCaseComments = async (req, res, next) => {
   try {
     const {
       page = 0,
-      limit = 10
+      limit = 10,
+      sortBy = 'createdAt',
+      order = 'desc'
     } = req.query;
+    const offset = parseInt(page) * parseInt(limit);
 
-    const comments = await CaseComment.findAndCountAll({
+    // Step 1: Get the actual count (without JOINs to avoid duplicates)
+    const total = await CaseComment.count({
+      where: { caseId: req.params.id }
+    });
+
+    // Step 2: Get paginated comments with JOINs
+    const comments = await CaseComment.findAll({
       where: { caseId: req.params.id },
       include: [
         {
@@ -298,22 +307,20 @@ exports.getCaseComments = async (req, res, next) => {
           attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
         }
       ],
-      order: [['createdAt', 'DESC']],
+      order: [[sortBy, order.toUpperCase()]],
       limit: parseInt(limit),
-      offset: parseInt(page) * parseInt(limit)
+      offset
     });
 
-    const formattedComments = comments.rows.map(comment => ({
+    const formattedComments = comments.map(comment => ({
       id: comment.id.toString(),
       content: comment.text,
       createdAt: comment.createdAt,
-      // If it's an admin comment, include admin details
       ...(comment.user ? {
         userId: comment.user.id.toString(),
         userName: comment.user.name,
         isAdmin: true
       } : {
-        // If it's a client comment, include client details
         clientName: comment.clientName,
         clientEmail: comment.clientEmail,
         clientPhone: comment.clientPhone,
@@ -330,7 +337,7 @@ exports.getCaseComments = async (req, res, next) => {
 
     res.status(200).json({
       comments: formattedComments,
-      total: comments.count,
+      total,
       page: parseInt(page),
       limit: parseInt(limit)
     });
@@ -339,12 +346,13 @@ exports.getCaseComments = async (req, res, next) => {
   }
 };
 
+
 // @desc    Create case comment
 // @route   POST /api/cases/:id/comments
 // @access  Public
 exports.createCaseComment = async (req, res, next) => {
   try {
-    const { content, clientName, clientEmail, clientPhone ,attachments} = req.body;
+    const { content, clientName, clientEmail, clientPhone, attachments} = req.body;
 
     // Validate the case exists
     const caseItem = await Case.findByPk(req.params.id);

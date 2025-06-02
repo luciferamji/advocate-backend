@@ -2,7 +2,7 @@ const { Hearing, Case, Client, Admin, HearingComment, HearingCommentDoc } = requ
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 const { upload } = require('../utils/fileUpload');
-
+const { moveFileFromTemp } = require('../utils/fileTransfer');
 // @desc    Get all hearings
 // @route   GET /api/hearings
 // @access  Private
@@ -305,7 +305,15 @@ exports.getHearingComments = async (req, res, next) => {
       order = 'desc'
     } = req.query;
 
-    const comments = await HearingComment.findAndCountAll({
+    const offset = parseInt(page) * parseInt(limit);
+
+    // Step 1: Get total count without JOINs
+    const total = await HearingComment.count({
+      where: { hearingId: req.params.id }
+    });
+
+    // Step 2: Get paginated rows with includes
+    const comments = await HearingComment.findAll({
       where: { hearingId: req.params.id },
       include: [
         {
@@ -316,47 +324,45 @@ exports.getHearingComments = async (req, res, next) => {
         },
         {
           model: HearingCommentDoc,
-          as: 'documents',
+          as: 'attachments',
           attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
         }
       ],
       order: [[sortBy, order.toUpperCase()]],
       limit: parseInt(limit),
-      offset: parseInt(page) * parseInt(limit)
+      offset
     });
 
-    const formattedComments = comments.rows.map(comment => ({
+    const formattedComments = comments.map(comment => ({
       id: comment.id.toString(),
       content: comment.text,
       createdAt: comment.createdAt,
-      // If it's an admin comment, include admin details
       ...(comment.user ? {
         userId: comment.user.id.toString(),
         userName: comment.user.name,
         isAdmin: true
       } : {
-        // If it's a client comment, include client details
         clientName: comment.clientName,
         clientEmail: comment.clientEmail,
         clientPhone: comment.clientPhone || '',
         isAdmin: false
       }),
-      documents: comment.documents.map(doc => ({
+      attachments: comment.attachments.map(doc => ({
         id: doc.id.toString(),
         fileName: doc.fileName,
         fileSize: doc.fileSize,
         fileType: doc.fileType,
-        url: `/uploads/${doc.filePath}`
+        url: `${doc.filePath}`
       }))
     }));
 
     res.status(200).json({
       comments: formattedComments,
       pagination: {
-        total: comments.count,
+        total,
         page: parseInt(page),
         limit: parseInt(limit),
-        totalPages: Math.ceil(comments.count / parseInt(limit))
+        totalPages: Math.ceil(total / parseInt(limit))
       }
     });
   } catch (error) {
@@ -369,7 +375,7 @@ exports.getHearingComments = async (req, res, next) => {
 // @access  Public
 exports.createHearingComment = async (req, res, next) => {
   try {
-    const { content, clientName, clientEmail, clientPhone } = req.body;
+    const { content, clientName, clientEmail, clientPhone, attachments } = req.body;
 
     // Validate the hearing exists
     const hearing = await Hearing.findByPk(req.params.id);
@@ -383,7 +389,6 @@ exports.createHearingComment = async (req, res, next) => {
       text: content
     };
 
-    console.log(req.user,"dadadadada");
     // If authenticated user (admin/advocate)
     if (req.user) {
       commentData.createdBy = req.user.id;
@@ -404,24 +409,22 @@ exports.createHearingComment = async (req, res, next) => {
     const comment = await HearingComment.create(commentData);
 
     // Handle file uploads if present
-    if (req.files && req.files.length > 0) {
-      const uploadHandler = upload.array('documents', 10);
-      uploadHandler(req, res, async (err) => {
-        if (err) {
-          return next(new ErrorResponse('Problem with file upload', 'FILE_UPLOAD_ERROR'));
-        }
+    if (attachments && attachments.length > 0) {
 
-        // Create document records
-        await Promise.all(req.files.map(file =>
-          HearingCommentDoc.create({
-            hearingCommentId: comment.id,
-            filePath: file.filename,
-            fileName: file.originalname,
-            fileType: file.mimetype,
-            fileSize: file.size
-          })
-        ));
-      });
+      // Create document records
+      await Promise.all(attachments.map(attachment =>
+        HearingCommentDoc.create({
+          hearingCommentId: comment.id,
+          filePath: attachment.url,
+          fileName: attachment.fileName,
+          fileType: attachment.fileType,
+          fileSize: attachment.fileSize
+        })
+      ));
+
+      await Promise.all(attachments.map(attachment =>
+        moveFileFromTemp(attachment.url)
+      ));
     }
 
     // Fetch the created comment with all associations
@@ -435,7 +438,7 @@ exports.createHearingComment = async (req, res, next) => {
         },
         {
           model: HearingCommentDoc,
-          as: 'documents',
+          as: 'attachments',
           attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
         }
       ]
@@ -457,12 +460,12 @@ exports.createHearingComment = async (req, res, next) => {
         clientPhone: newComment.clientPhone || '',
         isAdmin: false
       }),
-      documents: newComment.documents.map(doc => ({
+      attachments: newComment.attachments.map(doc => ({
         id: doc.id.toString(),
         fileName: doc.fileName,
         fileSize: doc.fileSize,
         fileType: doc.fileType,
-        url: `/uploads/${doc.filePath}`
+        url: `${doc.filePath}`
       }))
     });
   } catch (error) {

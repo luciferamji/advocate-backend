@@ -28,7 +28,7 @@ module.exports = (sequelize, DataTypes) => {
       references: {
         model: 'admin',
         key: 'id'
-      }
+      } 
     },
     courtName: {
       type: DataTypes.STRING,
