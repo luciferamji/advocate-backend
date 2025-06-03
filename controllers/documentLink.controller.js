@@ -50,7 +50,8 @@ exports.createDocumentLink = async (req, res, next) => {
       title,
       description,
       expiresAt: new Date(Date.now() + (expiresIn * 60 * 60 * 1000)),
-      createdBy: req.user.id
+      createdBy: req.user.id,
+      status: 'active'
     });
 
     // Send email with OTP
@@ -126,6 +127,40 @@ exports.getDocumentLinks = async (req, res, next) => {
     });
   } catch (error) {
     next(new ErrorResponse(error.message, 'DOCUMENT_LINKS_FETCH_ERROR'));
+  }
+};
+
+// @desc    Get single document link
+// @route   GET /api/document-links/:id
+// @access  Public
+exports.getDocumentLink = async (req, res, next) => {
+  try {
+    const link = await DocumentLink.findByPk(req.params.id, {
+      include: [{
+        model: Case,
+        as: 'case',
+        attributes: ['caseNumber', 'title']
+      }],
+      attributes: { exclude: ['otp'] }
+    });
+
+    if (!link) {
+      return next(new ErrorResponse('Document link not found', 'LINK_NOT_FOUND'));
+    }
+
+    if (link.status !== 'active') {
+      return next(new ErrorResponse('Link is no longer active', 'LINK_INACTIVE'));
+    }
+
+    if (new Date() > link.expiresAt) {
+      link.status = 'expired';
+      await link.save();
+      return next(new ErrorResponse('Link has expired', 'LINK_EXPIRED'));
+    }
+
+    res.status(200).json(link);
+  } catch (error) {
+    next(new ErrorResponse(error.message, 'DOCUMENT_LINK_FETCH_ERROR'));
   }
 };
 
