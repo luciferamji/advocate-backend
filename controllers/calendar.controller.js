@@ -10,22 +10,22 @@ exports.getCalendarData = async (req, res, next) => {
     let query = {};
     let caseQuery = {};
     let clientQuery = {};
-    
+
     // If not super-admin, only show own hearings
     if (req.user.role !== 'super-admin') {
-      caseQuery.createdBy = req.user.id;
+      caseQuery.advocateId = req.user.id;
     }
-    
+
     // Filter by case if provided
     if (req.query.caseId) {
       query.caseId = req.query.caseId;
     }
-    
+
     // Filter by client if provided
     if (req.query.clientId) {
       clientQuery.id = req.query.clientId;
     }
-    
+
     // Filter by date range if provided
     if (req.query.startDate && req.query.endDate) {
       query.date = {
@@ -43,7 +43,7 @@ exports.getCalendarData = async (req, res, next) => {
         [Op.lte]: new Date(req.query.endDate)
       };
     }
-    
+
     const hearings = await Hearing.findAll({
       where: query,
       include: [
@@ -64,30 +64,39 @@ exports.getCalendarData = async (req, res, next) => {
       ],
       order: [['date', 'ASC'], ['time', 'ASC']]
     });
-    
+
     // Format the data for calendar view
-    const calendarData = hearings.map(hearing => ({
-      id: hearing.id.toString(),
-      title: `Case: ${hearing.case.caseNumber}`,
-      start: new Date(hearing.date.toISOString().split('T')[0] + 'T' + hearing.time),
-      client: {
-        id: hearing.case.client.id.toString(),
-        name: hearing.case.client.name,
-        clientId: hearing.case.client.clientId
-      },
-      case: {
-        id: hearing.case.id.toString(),
-        caseNumber: hearing.case.caseNumber,
-        courtDetails: hearing.case.courtName
-      },
-      notes: hearing.notes,
-      status: hearing.status
-    }));
-    
+    const calendarData = hearings.map(hearing => {
+      // Create a new Date object from the date and time
+      const hearingDate = new Date(hearing.date);
+      const [hours, minutes] = hearing.time.split(':');
+      hearingDate.setHours(parseInt(hours), parseInt(minutes));
+
+      return {
+        id: hearing.id.toString(),
+        title: `Case: ${hearing.case.caseNumber}`,
+        start: hearingDate.toISOString(),
+        client: {
+          id: hearing.case.client.id.toString(),
+          name: hearing.case.client.name,
+          clientId: hearing.case.client.clientId
+        },
+        case: {
+          id: hearing.case.id.toString(),
+          caseNumber: hearing.case.caseNumber,
+          courtDetails: hearing.case.courtName
+        },
+        notes: hearing.notes,
+        status: hearing.status
+      };
+    });
+
     res.status(200).json({
       success: true,
-      count: calendarData.length,
-      data: calendarData
+      data: {
+        count: calendarData.length,
+        data: calendarData
+      }
     });
   } catch (error) {
     next(new ErrorResponse(error.message, 'CALENDAR_FETCH_ERROR'));
@@ -100,19 +109,19 @@ exports.getCalendarData = async (req, res, next) => {
 exports.getTodaysHearings = async (req, res, next) => {
   try {
     let caseQuery = {};
-    
+
     // If not super-admin, only show own hearings
     if (req.user.role !== 'super-admin') {
-      caseQuery.createdBy = req.user.id;
+      caseQuery.advocateId = req.user.id;
     }
-    
+
     // Get today's date
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     const hearings = await Hearing.findAll({
       where: {
         date: today
@@ -133,7 +142,7 @@ exports.getTodaysHearings = async (req, res, next) => {
       ],
       order: [['time', 'ASC']]
     });
-    
+
     // Format the data
     const todaysHearings = hearings.map(hearing => ({
       id: hearing.id.toString(),
@@ -143,7 +152,7 @@ exports.getTodaysHearings = async (req, res, next) => {
       courtDetails: hearing.case.courtName,
       status: hearing.status
     }));
-    
+
     res.status(200).json({
       success: true,
       count: todaysHearings.length,
@@ -160,26 +169,26 @@ exports.getTodaysHearings = async (req, res, next) => {
 exports.getUpcomingHearings = async (req, res, next) => {
   try {
     let caseQuery = {};
-    
+
     // If not super-admin, only show own hearings
     if (req.user.role !== 'super-admin') {
-      caseQuery.createdBy = req.user.id;
+      caseQuery.advocateId = req.user.id;
     }
-    
+
     // Get today's date
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     // Default to next 7 days if not specified
     const days = req.query.days ? parseInt(req.query.days) : 7;
-    
+
     if (isNaN(days) || days < 1) {
       return next(new ErrorResponse('Invalid days parameter', 'INVALID_PARAMETER', { parameter: 'days' }));
     }
-    
+
     const endDate = new Date(today);
     endDate.setDate(endDate.getDate() + days);
-    
+
     const hearings = await Hearing.findAll({
       where: {
         date: {
@@ -202,17 +211,17 @@ exports.getUpcomingHearings = async (req, res, next) => {
       ],
       order: [['date', 'ASC'], ['time', 'ASC']]
     });
-    
+
     // Format the data and group by date
     const upcomingHearings = {};
-    
+
     hearings.forEach(hearing => {
-      const date = hearing.date.toISOString().split('T')[0];
-      
+      const date = new Date(hearing.date).toISOString().split('T')[0];
+
       if (!upcomingHearings[date]) {
         upcomingHearings[date] = [];
       }
-      
+
       upcomingHearings[date].push({
         id: hearing.id.toString(),
         time: hearing.time,
@@ -222,7 +231,7 @@ exports.getUpcomingHearings = async (req, res, next) => {
         status: hearing.status
       });
     });
-    
+
     res.status(200).json({
       success: true,
       data: upcomingHearings

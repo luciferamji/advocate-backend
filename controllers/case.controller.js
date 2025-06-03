@@ -2,6 +2,7 @@ const { Case, Client, Admin, CaseComment, CaseCommentDoc } = require('../models'
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 const { upload } = require('../utils/fileUpload');
+const { moveFileFromTemp } = require('../utils/fileTransfer');
 
 // @desc    Get all cases
 // @route   GET /api/cases
@@ -279,10 +280,19 @@ exports.getCaseComments = async (req, res, next) => {
   try {
     const {
       page = 0,
-      limit = 10
+      limit = 10,
+      sortBy = 'createdAt',
+      order = 'desc'
     } = req.query;
+    const offset = parseInt(page) * parseInt(limit);
 
-    const comments = await CaseComment.findAndCountAll({
+    // Step 1: Get the actual count (without JOINs to avoid duplicates)
+    const total = await CaseComment.count({
+      where: { caseId: req.params.id }
+    });
+
+    // Step 2: Get paginated comments with JOINs
+    const comments = await CaseComment.findAll({
       where: { caseId: req.params.id },
       include: [
         {
@@ -293,43 +303,41 @@ exports.getCaseComments = async (req, res, next) => {
         },
         {
           model: CaseCommentDoc,
-          as: 'documents',
+          as: 'attachments',
           attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
         }
       ],
-      order: [['createdAt', 'DESC']],
+      order: [[sortBy, order.toUpperCase()]],
       limit: parseInt(limit),
-      offset: parseInt(page) * parseInt(limit)
+      offset
     });
 
-    const formattedComments = comments.rows.map(comment => ({
+    const formattedComments = comments.map(comment => ({
       id: comment.id.toString(),
       content: comment.text,
       createdAt: comment.createdAt,
-      // If it's an admin comment, include admin details
       ...(comment.user ? {
         userId: comment.user.id.toString(),
         userName: comment.user.name,
         isAdmin: true
       } : {
-        // If it's a client comment, include client details
         clientName: comment.clientName,
         clientEmail: comment.clientEmail,
         clientPhone: comment.clientPhone,
         isAdmin: false
       }),
-      documents: comment.documents.map(doc => ({
+      attachments: comment.attachments.map(doc => ({
         id: doc.id.toString(),
         fileName: doc.fileName,
         fileSize: doc.fileSize,
         fileType: doc.fileType,
-        url: `/uploads/${doc.filePath}`
+        url: `${doc.filePath}`
       }))
     }));
 
     res.status(200).json({
       comments: formattedComments,
-      total: comments.count,
+      total,
       page: parseInt(page),
       limit: parseInt(limit)
     });
@@ -338,12 +346,13 @@ exports.getCaseComments = async (req, res, next) => {
   }
 };
 
+
 // @desc    Create case comment
 // @route   POST /api/cases/:id/comments
 // @access  Public
 exports.createCaseComment = async (req, res, next) => {
   try {
-    const { content, clientName, clientEmail, clientPhone } = req.body;
+    const { content, clientName, clientEmail, clientPhone, attachments} = req.body;
 
     // Validate the case exists
     const caseItem = await Case.findByPk(req.params.id);
@@ -375,27 +384,25 @@ exports.createCaseComment = async (req, res, next) => {
     }
 
     const comment = await CaseComment.create(commentData);
-
     // Handle file uploads if present
-    if (req.files && req.files.length > 0) {
-      const uploadHandler = upload.array('documents', 10);
-      uploadHandler(req, res, async (err) => {
-        if (err) {
-          return next(new ErrorResponse('Problem with file upload', 'FILE_UPLOAD_ERROR'));
-        }
+    if (attachments && attachments.length > 0) {
 
         // Create document records
-        await Promise.all(req.files.map(file =>
+        await Promise.all(attachments.map(attachment =>
           CaseCommentDoc.create({
             caseCommentId: comment.id,
-            filePath: file.filename,
-            fileName: file.originalname,
-            fileType: file.mimetype,
-            fileSize: file.size
+            filePath: attachment.url,
+            fileName: attachment.fileName,
+            fileType: attachment.fileType,
+            fileSize: attachment.fileSize
           })
         ));
-      });
-    }
+
+        await Promise.all(attachments.map(attachment =>
+          moveFileFromTemp(attachment.url)
+        ));
+
+      }
 
     // Fetch the created comment with all associations
     const newComment = await CaseComment.findByPk(comment.id, {
@@ -408,7 +415,7 @@ exports.createCaseComment = async (req, res, next) => {
         },
         {
           model: CaseCommentDoc,
-          as: 'documents',
+          as: 'attachments',
           attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
         }
       ]
@@ -430,12 +437,12 @@ exports.createCaseComment = async (req, res, next) => {
         clientPhone: newComment.clientPhone,
         isAdmin: false
       }),
-      documents: newComment.documents.map(doc => ({
+      attachments: newComment.attachments.map(doc => ({
         id: doc.id.toString(),
         fileName: doc.fileName,
         fileSize: doc.fileSize,
         fileType: doc.fileType,
-        url: `/uploads/${doc.filePath}`
+        url: `${doc.filePath}`
       }))
     });
   } catch (error) {
