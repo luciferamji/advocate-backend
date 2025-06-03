@@ -2,6 +2,7 @@ const express = require('express');
 const {
   createDocumentLink,
   getDocumentLinks,
+  getDocumentLink,
   verifyOtp,
   uploadDocuments
 } = require('../controllers/documentLink.controller');
@@ -15,6 +16,7 @@ router.route('/')
   .get(protect, getDocumentLinks);
 
 // Public routes
+router.get('/:id', getDocumentLink);
 router.post('/:id/verify', verifyOtp);
 router.post('/:id/upload', uploadDocuments);
 
