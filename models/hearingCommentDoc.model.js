@@ -1,12 +1,12 @@
 module.exports = (sequelize, DataTypes) => {
   const HearingCommentDoc = sequelize.define('hearing_comment_doc', {
     id: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       primaryKey: true,
-      autoIncrement: true
+      defaultValue: DataTypes.UUIDV4,
     },
     hearingCommentId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: false,
       references: {
         model: 'hearing_comment',

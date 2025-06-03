@@ -1,12 +1,12 @@
 module.exports = (sequelize, DataTypes) => {
   const CaseCommentDoc = sequelize.define('case_comment_doc', {
     id: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       primaryKey: true,
-      autoIncrement: true
+      defaultValue: DataTypes.UUIDV4,
     },
     caseCommentId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: false,
       references: {
         model: 'case_comment',
