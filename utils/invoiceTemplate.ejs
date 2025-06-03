@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Invoice - Lawfy & Co</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Arial', sans-serif;
+      padding: 40px;
+      max-width: 800px;
+      margin: auto;
+      color: #333;
+      background: #fff;
+    }
+
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #000;
+      padding-bottom: 10px;
+    }
+
+    .header h2 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: 1px;
+    }
+
+    .office-address {
+      font-size: 13px;
+      margin-top: 10px;
+      white-space: pre-line;
+    }
+
+    .invoice-title {
+      text-align: center;
+      font-weight: bold;
+      font-size: 22px;
+      margin: 30px 0;
+      text-decoration: underline;
+    }
+
+    .client-section {
+      margin-bottom: 25px;
+    }
+
+    .client-section p {
+      margin: 2px 0;
+    }
+
+    .details-section table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    .details-section th, .details-section td {
+      border: 1px solid #999;
+      padding: 8px;
+    }
+
+    .details-section th {
+      background-color: #f0f0f0;
+      text-align: left;
+    }
+
+    .details-section td:last-child,
+    .details-section th:last-child {
+      text-align: right;
+    }
+
+    .totals {
+      text-align: right;
+      margin-top: 20px;
+      font-weight: bold;
+      font-size: 15px;
+    }
+
+    .totals p {
+      margin: 5px 0;
+    }
+
+    .bank-details {
+      font-size: 13px;
+      margin-top: 30px;
+      line-height: 1.5;
+    }
+
+    .signature {
+      text-align: right;
+      margin-top: 50px;
+      font-weight: bold;
+    }
+
+    .signature p {
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2>LAWFY & CO</h2>
+    <div class="office-address">
+      Kolkata Office: 4ES8B, Manicasadona, Newtown, Street No.-372, Kolkata – 700156, West Bengal<br>
+      Bangalore Office: 106, 1st Whitefield Main Road, Hoodi Circle, Bangalore 560048, Karnataka<br>
+      Email: ask@lawfyco.in | PH: 9147109222
+    </div>
+  </div>
+
+  <div class="invoice-title">INVOICE</div>
+
+  <div class="client-section">
+    <p><strong>To:</strong></p>
+    <p><%= clientName %></p>
+    <p>Contact: <%= clientContact %></p>
+  </div>
+
+  <div class="details-section">
+    <table>
+      <tr>
+        <th>Invoice No.</th>
+        <td><%= invoiceId %></td>
+        <th>Date</th>
+        <td><%= invoiceDate %></td>
+      </tr>
+      <tr>
+        <th>Due Date</th>
+        <td><%= dueDate %></td>
+        <th>Created By</th>
+        <td>LAWFY & CO</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="details-section">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 10%">Sr.</th>
+          <th>Description of Services</th>
+          <th style="width: 25%">Amount (INR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% items.forEach((item, index) => { %>
+          <tr>
+            <td><%= index + 1 %></td>
+            <td><%= item.description %></td>
+            <td><%= parseFloat(item.amount).toFixed(2) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="totals">
+    <p>Round Off: ₹0.00</p>
+    <p>Total: ₹<%= total.toFixed(2) %></p>
+    <p>Rupees <%= amountInWords %> Only. E & O.E.</p>
+  </div>
+
+  <div class="bank-details">
+    <strong>Bank Details:</strong><br>
+    PAN No.: AAMFL1888P<br>
+    Bank: ICICI Bank Ltd<br>
+    Account No.: 572205000063<br>
+    IFSC: ICIC0005722<br>
+    Account Holder: LAWFY & CO
+  </div>
+
+  <div class="signature">
+    <p>For</p>
+    <p>LAWFY & CO</p><br><br>
+    <p>Authorized Signatory</p>
+  </div>
+
+</body>
+</html>
