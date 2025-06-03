@@ -40,6 +40,7 @@ app.use('/api/comments', require('./routes/comments.routes'));
 app.use('/api/dashboard', require('./routes/dashboard.routes'));
 app.use('/api/upload', require('./routes/upload.routes'));
 app.use('/api/download', require('./routes/download.routes'));
+app.use('/api/document-links', require('./routes/documentLink.routes'));
 
 // Error handler middleware
 app.use((err, req, res, next) => {
