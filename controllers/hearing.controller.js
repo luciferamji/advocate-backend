@@ -391,7 +391,8 @@ exports.createHearingComment = async (req, res, next) => {
 
     // If authenticated user (admin/advocate)
     if (req.user) {
-      commentData.createdBy = req.user.id;
+      commentData.adminId = req.user.id;
+      commentData.creatorType = req.user.role;
     } else {
       // If client (unauthenticated)
       if (!clientName || !clientEmail) {
@@ -401,6 +402,7 @@ exports.createHearingComment = async (req, res, next) => {
           { required: ['clientName', 'clientEmail'] }
         ));
       }
+      commentData.creatorType = 'client';
       commentData.clientName = clientName;
       commentData.clientEmail = clientEmail;
       commentData.clientPhone = clientPhone;
@@ -410,7 +412,6 @@ exports.createHearingComment = async (req, res, next) => {
 
     // Handle file uploads if present
     if (attachments && attachments.length > 0) {
-
       // Create document records
       await Promise.all(attachments.map(attachment =>
         HearingCommentDoc.create({
@@ -448,17 +449,14 @@ exports.createHearingComment = async (req, res, next) => {
       id: newComment.id.toString(),
       content: newComment.text,
       createdAt: newComment.createdAt,
-      // If it's an admin comment, include admin details
-      ...(newComment.user ? {
+      creatorType: newComment.creatorType,
+      ...(newComment.adminId ? {
         userId: newComment.user.id.toString(),
-        userName: newComment.user.name,
-        isAdmin: true
+        userName: newComment.user.name
       } : {
-        // If it's a client comment, include client details
         clientName: newComment.clientName,
         clientEmail: newComment.clientEmail,
-        clientPhone: newComment.clientPhone || '',
-        isAdmin: false
+        clientPhone: newComment.clientPhone || ''
       }),
       attachments: newComment.attachments.map(doc => ({
         id: doc.id.toString(),
