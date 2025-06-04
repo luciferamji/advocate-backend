@@ -282,3 +282,21 @@ exports.uploadDocuments = async (req, res, next) => {
     next(new ErrorResponse(error.message, 'DOCUMENT_UPLOAD_ERROR'));
   }
 };
+
+// If client
+      // if (!clientId) {
+      //   return next(new ErrorResponse(
+      //     'Client ID is required',
+      //     'VALIDATION_ERROR',
+      //     { required: ['clientId'] }
+      //   ));
+      // }
+
+      // // Verify client exists
+      // const client = await Client.findByPk(clientId);
+      // if (!client) {
+      //   return next(new ErrorResponse('Client not found', 'CLIENT_NOT_FOUND'));
+      // }
+
+      // commentData.clientId = clientId;
+      // commentData.creatorType = 'client';
