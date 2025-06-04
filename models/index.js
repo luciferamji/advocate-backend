@@ -159,9 +159,6 @@ db.UploadLink.belongsTo(db.Admin, {
   as: 'admin'
 });
 
-
-
-
 // Add these associations
 db.Case.hasMany(db.DocumentLink, {
   foreignKey: 'caseId',
@@ -188,6 +185,17 @@ db.Admin.hasMany(db.DocumentLink, {
 db.DocumentLink.belongsTo(db.Admin, {
   foreignKey: 'createdBy',
   as: 'creator'
+});
+
+// Add these associations
+db.CaseComment.belongsTo(db.Client, {
+  foreignKey: 'clientId',
+  as: 'client'
+});
+
+db.HearingComment.belongsTo(db.Client, {
+  foreignKey: 'clientId',
+  as: 'client'
 });
 
 module.exports = db;
