@@ -29,20 +29,13 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
-    clientName: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    clientEmail: {
-      type: DataTypes.STRING,
+    clientId: {
+      type: DataTypes.UUID,
       allowNull: true,
-      validate: {
-        isEmail: true
+      references: {
+        model: 'client',
+        key: 'id'
       }
-    },
-    clientPhone: {
-      type: DataTypes.STRING,
-      allowNull: true
     }
   }, {
     timestamps: true,
