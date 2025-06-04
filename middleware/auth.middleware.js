@@ -1,40 +1,42 @@
 const { Admin } = require('../models');
+const { verifyTempToken } = require('../utils/tokenHandler');
 
 exports.protect = async (req, res, next) => {
   try {
+    // First check for regular session
     const sessionId = req.cookies.session;
 
-    // Check if session exists
-    if (!sessionId) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized to access this route'
-      });
-    }
-
-    try {
+    if (sessionId) {
       // Get user from session
       const user = await Admin.findOne({
         where: { sessionId },
         attributes: { exclude: ['password'] }
       });
       
-      if (!user) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid session'
-        });
+      if (user) {
+        req.user = user;
+        return next();
       }
-      
-      // Attach user to request object
-      req.user = user;
-      next();
-    } catch (error) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized to access this route'
-      });
     }
+
+    // If no valid session, check for temporary token
+    const tempToken = req.cookies.temp_token;
+
+    if (tempToken) {
+      const decoded = verifyTempToken(tempToken);
+      if (decoded && decoded.linkId) {
+        req.tempUser = {
+          linkId: decoded.linkId,
+          isTemp: true
+        };
+        return next();
+      }
+    }
+
+    return res.status(401).json({
+      success: false,
+      message: 'Not authorized to access this route'
+    });
   } catch (error) {
     next(error);
   }

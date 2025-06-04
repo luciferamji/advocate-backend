@@ -1,8 +1,27 @@
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 
 // Generate session ID
 const generateSessionId = () => {
   return crypto.randomBytes(32).toString('hex');
+};
+
+// Generate temporary token for document uploads
+const generateTempToken = (linkId) => {
+  return jwt.sign(
+    { linkId },
+    process.env.JWT_SECRET,
+    { expiresIn: '1h' }
+  );
+};
+
+// Verify temporary token
+const verifyTempToken = (token) => {
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET);
+  } catch (error) {
+    return null;
+  }
 };
 
 // Set session cookie and return sessionId
@@ -41,5 +60,7 @@ const sendTokenResponse = async (user, statusCode, res) => {
 
 module.exports = {
   generateSessionId,
+  generateTempToken,
+  verifyTempToken,
   sendTokenResponse
 };
