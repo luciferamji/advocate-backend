@@ -396,22 +396,12 @@ exports.createHearingComment = async (req, res, next) => {
       commentData.creatorType = req.user.role;
     } else {
       // If client
-      if (!clientId) {
+      
         return next(new ErrorResponse(
           'Client ID is required',
           'VALIDATION_ERROR',
           { required: ['clientId'] }
         ));
-      }
-
-      // Verify client exists
-      const client = await Client.findByPk(clientId);
-      if (!client) {
-        return next(new ErrorResponse('Client not found', 'CLIENT_NOT_FOUND'));
-      }
-
-      commentData.clientId = clientId;
-      commentData.creatorType = 'client';
     }
 
     const comment = await HearingComment.create(commentData);
@@ -446,7 +436,7 @@ exports.createHearingComment = async (req, res, next) => {
         {
           model: Client,
           as: 'client',
-          attributes: ['id', 'name', 'email', 'phone'],
+          attributes: ['id', 'name'],
           required: false
         },
         {
@@ -468,8 +458,6 @@ exports.createHearingComment = async (req, res, next) => {
       } : {
         clientId: newComment.client.id.toString(),
         clientName: newComment.client.name,
-        clientEmail: newComment.client.email,
-        clientPhone: newComment.client.phone || ''
       }),
       attachments: newComment.attachments.map(doc => ({
         id: doc.id.toString(),
