@@ -351,7 +351,7 @@ exports.getCaseComments = async (req, res, next) => {
 // @access  Public
 exports.createCaseComment = async (req, res, next) => {
   try {
-    const { content, clientName, clientEmail, clientPhone, attachments } = req.body;
+    const { content, clientId, attachments } = req.body;
 
     // Validate the case exists
     const caseItem = await Case.findByPk(req.params.id);
@@ -370,18 +370,23 @@ exports.createCaseComment = async (req, res, next) => {
       commentData.adminId = req.user.id;
       commentData.creatorType = req.user.role;
     } else {
-      // If client (unauthenticated)
-      if (!clientName || !clientEmail) {
+      // If client
+      if (!clientId) {
         return next(new ErrorResponse(
-          'Please provide name and email for client comment',
+          'Client ID is required',
           'VALIDATION_ERROR',
-          { required: ['clientName', 'clientEmail'] }
+          { required: ['clientId'] }
         ));
       }
+
+      // Verify client exists
+      const client = await Client.findByPk(clientId);
+      if (!client) {
+        return next(new ErrorResponse('Client not found', 'CLIENT_NOT_FOUND'));
+      }
+
+      commentData.clientId = clientId;
       commentData.creatorType = 'client';
-      commentData.clientName = clientName;
-      commentData.clientEmail = clientEmail;
-      commentData.clientPhone = clientPhone;
     }
 
     const comment = await CaseComment.create(commentData);
@@ -414,6 +419,12 @@ exports.createCaseComment = async (req, res, next) => {
           required: false
         },
         {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'name', 'email', 'phone'],
+          required: false
+        },
+        {
           model: CaseCommentDoc,
           as: 'attachments',
           attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
@@ -430,9 +441,10 @@ exports.createCaseComment = async (req, res, next) => {
         userId: newComment.user.id.toString(),
         userName: newComment.user.name
       } : {
-        clientName: newComment.clientName,
-        clientEmail: newComment.clientEmail,
-        clientPhone: newComment.clientPhone || ''
+        clientId: newComment.client.id.toString(),
+        clientName: newComment.client.name,
+        clientEmail: newComment.client.email,
+        clientPhone: newComment.client.phone || ''
       }),
       attachments: newComment.attachments.map(doc => ({
         id: doc.id.toString(),
