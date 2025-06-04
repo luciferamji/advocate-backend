@@ -302,6 +302,12 @@ exports.getCaseComments = async (req, res, next) => {
           required: false
         },
         {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'name', 'email', 'phone'],
+          required: false
+        },
+        {
           model: CaseCommentDoc,
           as: 'attachments',
           attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
@@ -316,15 +322,15 @@ exports.getCaseComments = async (req, res, next) => {
       id: comment.id.toString(),
       content: comment.text,
       createdAt: comment.createdAt,
-      ...(comment.user ? {
+      creatorType: comment.creatorType,
+      ...(comment.adminId ? {
         userId: comment.user.id.toString(),
-        userName: comment.user.name,
-        isAdmin: true
+        userName: comment.user.name
       } : {
-        clientName: comment.clientName,
-        clientEmail: comment.clientEmail,
-        clientPhone: comment.clientPhone,
-        isAdmin: false
+        clientId: comment.client.id.toString(),
+        clientName: comment.client.name,
+        clientEmail: comment.client.email,
+        clientPhone: comment.client.phone || ''
       }),
       attachments: comment.attachments.map(doc => ({
         id: doc.id.toString(),
