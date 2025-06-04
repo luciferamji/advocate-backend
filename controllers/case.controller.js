@@ -343,9 +343,12 @@ exports.getCaseComments = async (req, res, next) => {
 
     res.status(200).json({
       comments: formattedComments,
-      total,
-      page: parseInt(page),
-      limit: parseInt(limit)
+      pagination: {
+        total: total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / parseInt(limit))
+      }
     });
   } catch (error) {
     next(new ErrorResponse(error.message, 'COMMENT_LIST_ERROR'));

@@ -91,11 +91,11 @@ db.HearingComment.belongsTo(db.Hearing, {
 
 // Admin - HearingComment relationship (1:Many)
 db.Admin.hasMany(db.HearingComment, {
-  foreignKey: 'createdBy',
+  foreignKey: 'adminId',
   as: 'hearingComments'
 });
 db.HearingComment.belongsTo(db.Admin, {
-  foreignKey: 'createdBy',
+  foreignKey: 'adminId',
   as: 'user'
 });
 
@@ -121,11 +121,11 @@ db.CaseComment.belongsTo(db.Case, {
 
 // Admin - CaseComment relationship (1:Many)
 db.Admin.hasMany(db.CaseComment, {
-  foreignKey: 'createdBy',
+  foreignKey: 'adminId',
   as: 'caseComments'
 });
 db.CaseComment.belongsTo(db.Admin, {
-  foreignKey: 'createdBy',
+  foreignKey: 'adminId',
   as: 'user'
 });
 
@@ -187,7 +187,6 @@ db.DocumentLink.belongsTo(db.Admin, {
   as: 'creator'
 });
 
-// Add these associations
 db.CaseComment.belongsTo(db.Client, {
   foreignKey: 'clientId',
   as: 'client'
