@@ -17,7 +17,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: false
     },
-    createdBy: {
+    creatorType: {
+      type: DataTypes.ENUM('super-admin', 'advocate', 'client'),
+      allowNull: false
+    },
+    adminId: {
       type: DataTypes.UUID,
       allowNull: true,
       references: {
