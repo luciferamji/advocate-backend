@@ -3,6 +3,7 @@ const ErrorResponse = require('../utils/errorHandler');
 const { sendEmail } = require('../utils/email');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
+const { generateTempToken } = require('../utils/tokenHandler');
 
 // @desc    Create document link
 // @route   POST /api/document-links
@@ -43,12 +44,18 @@ exports.createDocumentLink = async (req, res, next) => {
       }
     }
 
+    // Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const salt = await bcrypt.genSalt(10);
+    const hashedOtp = await bcrypt.hash(otp, salt);
+
     // Create document link
     const link = await DocumentLink.create({
       caseId,
       hearingId,
       title,
       description,
+      otp: hashedOtp,
       expiresAt: new Date(Date.now() + (expiresIn * 60 * 60 * 1000)),
       createdBy: req.user.id,
       status: 'active'
@@ -65,15 +72,14 @@ exports.createDocumentLink = async (req, res, next) => {
         <p><strong>Title:</strong> ${title}</p>
         ${description ? `<p><strong>Description:</strong> ${description}</p>` : ''}
         <p><strong>Upload Link:</strong> <a href="${uploadUrl}">${uploadUrl}</a></p>
-        <p><strong>OTP:</strong> ${link.plainOtp}</p>
+        <p><strong>OTP:</strong> ${otp}</p>
         <p>This link will expire in ${expiresIn} hours.</p>
       `
     });
 
-    // Remove plain OTP before sending response
+    // Remove OTP from response
     const response = link.toJSON();
     delete response.otp;
-    delete response.plainOtp;
 
     res.status(201).json(response);
   } catch (error) {
@@ -164,7 +170,7 @@ exports.getDocumentLink = async (req, res, next) => {
   }
 };
 
-// @desc    Verify OTP
+// @desc    Verify OTP and generate temporary token
 // @route   POST /api/document-links/:id/verify
 // @access  Public
 exports.verifyOtp = async (req, res, next) => {
@@ -193,8 +199,23 @@ exports.verifyOtp = async (req, res, next) => {
 
     const isMatch = await bcrypt.compare(otp, link.otp);
     
+    if (!isMatch) {
+      return next(new ErrorResponse('Invalid OTP', 'INVALID_OTP'));
+    }
+
+    // Generate temporary token
+    const tempToken = generateTempToken(link.id);
+
+    // Set cookie with temporary token
+    res.cookie('temp_token', tempToken, {
+      expires: new Date(link.expiresAt),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
+    });
+
     res.status(200).json({
-      verified: isMatch
+      verified: true
     });
   } catch (error) {
     next(new ErrorResponse(error.message, 'OTP_VERIFICATION_ERROR'));
@@ -203,7 +224,7 @@ exports.verifyOtp = async (req, res, next) => {
 
 // @desc    Upload documents
 // @route   POST /api/document-links/:id/upload
-// @access  Public
+// @access  Private (Temporary Token)
 exports.uploadDocuments = async (req, res, next) => {
   try {
     const link = await DocumentLink.findByPk(req.params.id, {
@@ -249,6 +270,9 @@ exports.uploadDocuments = async (req, res, next) => {
     // Mark link as used
     link.status = 'used';
     await link.save();
+
+    // Clear temporary token
+    res.clearCookie('temp_token');
 
     res.status(200).json({
       success: true,
