@@ -45,8 +45,7 @@ const storage = multer.diskStorage({
 const fileFilter = (req, file, cb) => {
   // Allow all files for resumable chunk uploads
 
-
-  if (req.baseUrl.includes('/api/upload')) {
+  if (req.baseUrl.includes('/api/upload') || (req.baseUrl.includes('/api/document-links') && req.path.includes('/upload'))) {
     return cb(null, true);
   }
 
