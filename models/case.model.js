@@ -41,10 +41,6 @@ module.exports = (sequelize, DataTypes) => {
     status: {
       type: DataTypes.ENUM('OPEN', 'PENDING', 'CLOSED'),
       defaultValue: 'OPEN'
-    },
-    nextHearing: {
-      type: DataTypes.DATE,
-      allowNull: true
     }
   }, {
     timestamps: true,

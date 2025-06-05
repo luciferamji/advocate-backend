@@ -4,7 +4,7 @@ const {
   getDocumentLinks,
   getDocumentLink,
   verifyOtp,
-  uploadDocuments
+  createComment
 } = require('../controllers/documentLink.controller');
 const { protect } = require('../middleware/auth.middleware');
 const { checkChunk, uploadChunk, completeUpload } = require('../controllers/upload.controller');
@@ -18,7 +18,7 @@ router.route('/')
 // Public routes
 router.get('/:id', getDocumentLink);
 router.post('/:id/verify', verifyOtp);
-router.post('/:id/upload', uploadDocuments);
+router.post('/:id/comments', createComment);
 router.get('/upload/chunk', protect, checkChunk);
 router.post('/upload/chunk', protect, uploadChunk);
 router.post('/upload/complete', protect, completeUpload);

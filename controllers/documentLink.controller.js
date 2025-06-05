@@ -44,21 +44,16 @@ exports.createDocumentLink = async (req, res, next) => {
       }
     }
 
-    // Generate OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const salt = await bcrypt.genSalt(10);
-    const hashedOtp = await bcrypt.hash(otp, salt);
-
     // Create document link
     const link = await DocumentLink.create({
       caseId,
       hearingId,
       title,
       description,
-      otp: hashedOtp,
       expiresAt: new Date(Date.now() + (expiresIn * 60 * 60 * 1000)),
       createdBy: req.user.id,
-      status: 'active'
+      status: 'active',
+      clientId: caseItem.client.id
     });
 
     // Send email with OTP
@@ -72,7 +67,7 @@ exports.createDocumentLink = async (req, res, next) => {
         <p><strong>Title:</strong> ${title}</p>
         ${description ? `<p><strong>Description:</strong> ${description}</p>` : ''}
         <p><strong>Upload Link:</strong> <a href="${uploadUrl}">${uploadUrl}</a></p>
-        <p><strong>OTP:</strong> ${otp}</p>
+        <p><strong>OTP:</strong> ${link.plainOtp}</p>
         <p>This link will expire in ${expiresIn} hours.</p>
       `
     });
@@ -198,7 +193,7 @@ exports.verifyOtp = async (req, res, next) => {
     }
 
     const isMatch = await bcrypt.compare(otp, link.otp);
-    
+
     if (!isMatch) {
       return next(new ErrorResponse('Invalid OTP', 'INVALID_OTP'));
     }
@@ -222,13 +217,13 @@ exports.verifyOtp = async (req, res, next) => {
   }
 };
 
-// @desc    Upload documents
-// @route   POST /api/document-links/:id/upload
+// @desc    Create a comment
+// @route   POST /api/document-links/:id/comments
 // @access  Private (Temporary Token)
-exports.uploadDocuments = async (req, res, next) => {
+exports.createComment = async (req, res, next) => {
   try {
     const link = await DocumentLink.findByPk(req.params.id, {
-      include: [{ model: Case, as: 'case' }]
+      include: [{ model: Case, as: 'case', required: true }, { model: Hearing, as: 'hearing', required: false }],
     });
 
     if (!link) {
@@ -255,15 +250,15 @@ exports.uploadDocuments = async (req, res, next) => {
       await HearingComment.create({
         hearingId: link.hearingId,
         text: comment,
-        clientName: link.case.client.name,
-        clientEmail: link.case.client.email
+        clientId: link.clientId,
+        creatorType: 'client'
       });
     } else {
       await CaseComment.create({
         caseId: link.caseId,
         text: comment,
-        clientName: link.case.client.name,
-        clientEmail: link.case.client.email
+        clientId: link.clientId,
+        creatorType: 'client'
       });
     }
 
@@ -284,19 +279,19 @@ exports.uploadDocuments = async (req, res, next) => {
 };
 
 // If client
-      // if (!clientId) {
-      //   return next(new ErrorResponse(
-      //     'Client ID is required',
-      //     'VALIDATION_ERROR',
-      //     { required: ['clientId'] }
-      //   ));
-      // }
+// if (!clientId) {
+//   return next(new ErrorResponse(
+//     'Client ID is required',
+//     'VALIDATION_ERROR',
+//     { required: ['clientId'] }
+//   ));
+// }
 
-      // // Verify client exists
-      // const client = await Client.findByPk(clientId);
-      // if (!client) {
-      //   return next(new ErrorResponse('Client not found', 'CLIENT_NOT_FOUND'));
-      // }
+// // Verify client exists
+// const client = await Client.findByPk(clientId);
+// if (!client) {
+//   return next(new ErrorResponse('Client not found', 'CLIENT_NOT_FOUND'));
+// }
 
-      // commentData.clientId = clientId;
-      // commentData.creatorType = 'client';
+// commentData.clientId = clientId;
+// commentData.creatorType = 'client';

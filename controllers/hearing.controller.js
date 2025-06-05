@@ -327,6 +327,12 @@ exports.getHearingComments = async (req, res, next) => {
           model: HearingCommentDoc,
           as: 'attachments',
           attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
+        },
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'name'],
+          required: false
         }
       ],
       order: [[sortBy, order.toUpperCase()]],
@@ -343,9 +349,8 @@ exports.getHearingComments = async (req, res, next) => {
         userName: comment.user.name,
         isAdmin: true
       } : {
-        clientName: comment.clientName,
-        clientEmail: comment.clientEmail,
-        clientPhone: comment.clientPhone || '',
+        userId: comment.client.id.toString(),
+        userName: comment.client.name,
         isAdmin: false
       }),
       attachments: comment.attachments.map(doc => ({
