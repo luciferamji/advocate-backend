@@ -304,7 +304,7 @@ exports.getCaseComments = async (req, res, next) => {
         {
           model: Client,
           as: 'client',
-          attributes: ['id', 'name', 'email', 'phone'],
+          attributes: ['id', 'name'],
           required: false
         },
         {
@@ -325,12 +325,12 @@ exports.getCaseComments = async (req, res, next) => {
       creatorType: comment.creatorType,
       ...(comment.adminId ? {
         userId: comment.user.id.toString(),
-        userName: comment.user.name
+        userName: comment.user.name,
+        isAdmin: true
       } : {
-        clientId: comment.client.id.toString(),
-        clientName: comment.client.name,
-        clientEmail: comment.client.email,
-        clientPhone: comment.client.phone || ''
+        userId: comment.client.id.toString(),
+        userName: comment.client.name,
+        isAdmin: false
       }),
       attachments: comment.attachments.map(doc => ({
         id: doc.id.toString(),

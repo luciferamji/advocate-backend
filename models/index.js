@@ -197,4 +197,14 @@ db.HearingComment.belongsTo(db.Client, {
   as: 'client'
 });
 
+db.DocumentLink.belongsTo(db.Client, {
+  foreignKey: 'clientId',
+  as: 'client'
+});
+
+db.Client.hasMany(db.DocumentLink, {
+  foreignKey: 'clientId',
+  as: 'documentLinks'
+});
+
 module.exports = db;
