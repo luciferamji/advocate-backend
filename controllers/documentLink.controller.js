@@ -1,9 +1,10 @@
-const { DocumentLink, Case, Hearing, Client, CaseComment, HearingComment } = require('../models');
+const { DocumentLink, Case, Hearing, Client, CaseComment, HearingComment,CaseCommentDoc ,HearingCommentDoc } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { sendEmail } = require('../utils/email');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const { generateTempToken } = require('../utils/tokenHandler');
+const { moveFileFromTemp } = require('../utils/fileTransfer');
 
 // @desc    Create document link
 // @route   POST /api/document-links
@@ -240,26 +241,61 @@ exports.createComment = async (req, res, next) => {
       return next(new ErrorResponse('Link has expired', 'LINK_EXPIRED'));
     }
 
-    const { comment } = req.body;
+    const { comment, attachments } = req.body;
     if (!comment) {
       return next(new ErrorResponse('Comment is required', 'VALIDATION_ERROR'));
     }
 
     // Create comment based on whether it's for a case or hearing
     if (link.hearingId) {
-      await HearingComment.create({
+      const hearingComment = await HearingComment.create({
         hearingId: link.hearingId,
         text: comment,
         clientId: link.clientId,
         creatorType: 'client'
       });
+
+      if (attachments && attachments.length > 0) {
+        // Create document records
+        await Promise.all(attachments.map(attachment =>
+          HearingCommentDoc.create({
+            hearingCommentId: hearingComment.id,
+            filePath: attachment.url,
+            fileName: attachment.fileName,
+            fileType: attachment.fileType,
+            fileSize: attachment.fileSize
+          })
+        ));
+
+        await Promise.all(attachments.map(attachment =>
+          moveFileFromTemp(attachment.url)
+        ));
+      }
+
     } else {
-      await CaseComment.create({
+      const caseComment = await CaseComment.create({
         caseId: link.caseId,
         text: comment,
         clientId: link.clientId,
         creatorType: 'client'
       });
+
+      if (attachments && attachments.length > 0) {
+        // Create document records
+        await Promise.all(attachments.map(attachment =>
+          CaseCommentDoc.create({
+            caseCommentId: caseComment.id,
+            filePath: attachment.url,
+            fileName: attachment.fileName,
+            fileType: attachment.fileType,
+            fileSize: attachment.fileSize
+          })
+        ));
+
+        await Promise.all(attachments.map(attachment =>
+          moveFileFromTemp(attachment.url)
+        ));
+      }
     }
 
     // Mark link as used
