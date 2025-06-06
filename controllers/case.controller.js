@@ -29,7 +29,6 @@ exports.getCases = async (req, res, next) => {
       ];
     }
 
-    // If not super-admin, only show own cases
     if (req.user.role !== 'super-admin') {
       whereClause.advocateId = req.user.id;
     }
@@ -41,6 +40,19 @@ exports.getCases = async (req, res, next) => {
           model: Client,
           as: 'client',
           attributes: ['id', 'name']
+        },
+        {
+          model: Hearing,
+          as: 'hearings',
+          where: {
+            date: {
+              [Op.gte]: new Date() // Only future or today
+            }
+          },
+          required: false,
+          separate: true,
+          order: [['date', 'ASC']],
+          limit: 1 // Get only the next hearing
         }
       ],
       order: [['createdAt', 'DESC']],
@@ -51,19 +63,22 @@ exports.getCases = async (req, res, next) => {
 
     const totalPages = Math.ceil(count / parseInt(limit));
 
-    const cases = rows.map(caseItem => ({
-      id: caseItem.id.toString(),
-      caseNumber: caseItem.caseNumber,
-      title: caseItem.title,
-      description: caseItem.description,
-      clientId: caseItem.client.id.toString(),
-      clientName: caseItem.client.name,
-      courtName: caseItem.courtName,
-      status: caseItem.status,
-      nextHearing: caseItem.nextHearing,
-      createdAt: caseItem.createdAt,
-      updatedAt: caseItem.updatedAt
-    }));
+    const cases = rows.map(caseItem => {
+      const nextHearing = caseItem.hearings?.[0]?.date || null;
+      return {
+        id: caseItem.id.toString(),
+        caseNumber: caseItem.caseNumber,
+        title: caseItem.title,
+        description: caseItem.description,
+        clientId: caseItem.client?.id?.toString() || null,
+        clientName: caseItem.client?.name || null,
+        courtName: caseItem.courtName,
+        status: caseItem.status,
+        nextHearing,
+        createdAt: caseItem.createdAt,
+        updatedAt: caseItem.updatedAt
+      };
+    });
 
     res.status(200).json({
       cases,
@@ -90,6 +105,19 @@ exports.getCase = async (req, res, next) => {
           model: Client,
           as: 'client',
           attributes: ['id', 'name']
+        },
+        {
+          model: Hearing,
+          as: 'hearings',
+          where: {
+            date: {
+              [Op.gte]: new Date() // Only future or today
+            }
+          },
+          required: false,
+          separate: true,
+          order: [['date', 'ASC']],
+          limit: 1 // Get only the next hearing
         }
       ]
     });
@@ -112,7 +140,7 @@ exports.getCase = async (req, res, next) => {
       clientName: caseItem.client.name,
       courtName: caseItem.courtName,
       status: caseItem.status,
-      nextHearing: caseItem.nextHearing,
+      nextHearing: caseItem.hearings?.[0]?.date || null,
       createdAt: caseItem.createdAt,
       updatedAt: caseItem.updatedAt
     });
