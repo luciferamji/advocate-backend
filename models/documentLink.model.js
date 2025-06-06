@@ -24,6 +24,14 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
+    clientId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'client',
+        key: 'id'
+      }
+    },
     title: {
       type: DataTypes.STRING,
       allowNull: false
@@ -56,7 +64,7 @@ module.exports = (sequelize, DataTypes) => {
     timestamps: true,
     tableName: 'document_link',
     hooks: {
-      beforeCreate: async (link) => {
+      beforeValidate: async (link) => {
         // Generate 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const salt = await bcrypt.genSalt(10);

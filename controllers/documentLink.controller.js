@@ -1,8 +1,10 @@
-const { DocumentLink, Case, Hearing, Client, CaseComment, HearingComment } = require('../models');
+const { DocumentLink, Case, Hearing, Client, CaseComment, HearingComment,CaseCommentDoc ,HearingCommentDoc } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { sendEmail } = require('../utils/email');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
+const { generateTempToken } = require('../utils/tokenHandler');
+const { moveFileFromTemp } = require('../utils/fileTransfer');
 
 // @desc    Create document link
 // @route   POST /api/document-links
@@ -50,7 +52,9 @@ exports.createDocumentLink = async (req, res, next) => {
       title,
       description,
       expiresAt: new Date(Date.now() + (expiresIn * 60 * 60 * 1000)),
-      createdBy: req.user.id
+      createdBy: req.user.id,
+      status: 'active',
+      clientId: caseItem.client.id
     });
 
     // Send email with OTP
@@ -69,10 +73,9 @@ exports.createDocumentLink = async (req, res, next) => {
       `
     });
 
-    // Remove plain OTP before sending response
+    // Remove OTP from response
     const response = link.toJSON();
     delete response.otp;
-    delete response.plainOtp;
 
     res.status(201).json(response);
   } catch (error) {
@@ -129,7 +132,41 @@ exports.getDocumentLinks = async (req, res, next) => {
   }
 };
 
-// @desc    Verify OTP
+// @desc    Get single document link
+// @route   GET /api/document-links/:id
+// @access  Public
+exports.getDocumentLink = async (req, res, next) => {
+  try {
+    const link = await DocumentLink.findByPk(req.params.id, {
+      include: [{
+        model: Case,
+        as: 'case',
+        attributes: ['caseNumber', 'title']
+      }],
+      attributes: { exclude: ['otp'] }
+    });
+
+    if (!link) {
+      return next(new ErrorResponse('Document link not found', 'LINK_NOT_FOUND'));
+    }
+
+    if (link.status !== 'active') {
+      return next(new ErrorResponse('Link is no longer active', 'LINK_INACTIVE'));
+    }
+
+    if (new Date() > link.expiresAt) {
+      link.status = 'expired';
+      await link.save();
+      return next(new ErrorResponse('Link has expired', 'LINK_EXPIRED'));
+    }
+
+    res.status(200).json(link);
+  } catch (error) {
+    next(new ErrorResponse(error.message, 'DOCUMENT_LINK_FETCH_ERROR'));
+  }
+};
+
+// @desc    Verify OTP and generate temporary token
 // @route   POST /api/document-links/:id/verify
 // @access  Public
 exports.verifyOtp = async (req, res, next) => {
@@ -157,22 +194,37 @@ exports.verifyOtp = async (req, res, next) => {
     }
 
     const isMatch = await bcrypt.compare(otp, link.otp);
-    
+
+    if (!isMatch) {
+      return next(new ErrorResponse('Invalid OTP', 'INVALID_OTP'));
+    }
+
+    // Generate temporary token
+    const tempToken = generateTempToken(link.id);
+
+    // Set cookie with temporary token
+    res.cookie('temp_token', tempToken, {
+      expires: new Date(link.expiresAt),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
+    });
+
     res.status(200).json({
-      verified: isMatch
+      verified: true
     });
   } catch (error) {
     next(new ErrorResponse(error.message, 'OTP_VERIFICATION_ERROR'));
   }
 };
 
-// @desc    Upload documents
-// @route   POST /api/document-links/:id/upload
-// @access  Public
-exports.uploadDocuments = async (req, res, next) => {
+// @desc    Create a comment
+// @route   POST /api/document-links/:id/comments
+// @access  Private (Temporary Token)
+exports.createComment = async (req, res, next) => {
   try {
     const link = await DocumentLink.findByPk(req.params.id, {
-      include: [{ model: Case, as: 'case' }]
+      include: [{ model: Case, as: 'case', required: true }, { model: Hearing, as: 'hearing', required: false }],
     });
 
     if (!link) {
@@ -189,31 +241,69 @@ exports.uploadDocuments = async (req, res, next) => {
       return next(new ErrorResponse('Link has expired', 'LINK_EXPIRED'));
     }
 
-    const { comment } = req.body;
+    const { comment, attachments } = req.body;
     if (!comment) {
       return next(new ErrorResponse('Comment is required', 'VALIDATION_ERROR'));
     }
 
     // Create comment based on whether it's for a case or hearing
     if (link.hearingId) {
-      await HearingComment.create({
+      const hearingComment = await HearingComment.create({
         hearingId: link.hearingId,
         text: comment,
-        clientName: link.case.client.name,
-        clientEmail: link.case.client.email
+        clientId: link.clientId,
+        creatorType: 'client'
       });
+
+      if (attachments && attachments.length > 0) {
+        // Create document records
+        await Promise.all(attachments.map(attachment =>
+          HearingCommentDoc.create({
+            hearingCommentId: hearingComment.id,
+            filePath: attachment.url,
+            fileName: attachment.fileName,
+            fileType: attachment.fileType,
+            fileSize: attachment.fileSize
+          })
+        ));
+
+        await Promise.all(attachments.map(attachment =>
+          moveFileFromTemp(attachment.url)
+        ));
+      }
+
     } else {
-      await CaseComment.create({
+      const caseComment = await CaseComment.create({
         caseId: link.caseId,
         text: comment,
-        clientName: link.case.client.name,
-        clientEmail: link.case.client.email
+        clientId: link.clientId,
+        creatorType: 'client'
       });
+
+      if (attachments && attachments.length > 0) {
+        // Create document records
+        await Promise.all(attachments.map(attachment =>
+          CaseCommentDoc.create({
+            caseCommentId: caseComment.id,
+            filePath: attachment.url,
+            fileName: attachment.fileName,
+            fileType: attachment.fileType,
+            fileSize: attachment.fileSize
+          })
+        ));
+
+        await Promise.all(attachments.map(attachment =>
+          moveFileFromTemp(attachment.url)
+        ));
+      }
     }
 
     // Mark link as used
     link.status = 'used';
     await link.save();
+
+    // Clear temporary token
+    res.clearCookie('temp_token');
 
     res.status(200).json({
       success: true,
@@ -223,3 +313,21 @@ exports.uploadDocuments = async (req, res, next) => {
     next(new ErrorResponse(error.message, 'DOCUMENT_UPLOAD_ERROR'));
   }
 };
+
+// If client
+// if (!clientId) {
+//   return next(new ErrorResponse(
+//     'Client ID is required',
+//     'VALIDATION_ERROR',
+//     { required: ['clientId'] }
+//   ));
+// }
+
+// // Verify client exists
+// const client = await Client.findByPk(clientId);
+// if (!client) {
+//   return next(new ErrorResponse('Client not found', 'CLIENT_NOT_FOUND'));
+// }
+
+// commentData.clientId = clientId;
+// commentData.creatorType = 'client';
