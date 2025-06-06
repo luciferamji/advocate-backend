@@ -3,6 +3,7 @@ const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 const { upload } = require('../utils/fileUpload');
 const { moveFileFromTemp } = require('../utils/fileTransfer');
+
 // @desc    Get all hearings
 // @route   GET /api/hearings
 // @access  Private
@@ -326,6 +327,12 @@ exports.getHearingComments = async (req, res, next) => {
           model: HearingCommentDoc,
           as: 'attachments',
           attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
+        },
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'name'],
+          required: false
         }
       ],
       order: [[sortBy, order.toUpperCase()]],
@@ -342,9 +349,8 @@ exports.getHearingComments = async (req, res, next) => {
         userName: comment.user.name,
         isAdmin: true
       } : {
-        clientName: comment.clientName,
-        clientEmail: comment.clientEmail,
-        clientPhone: comment.clientPhone || '',
+        userId: comment.client.id.toString(),
+        userName: comment.client.name,
         isAdmin: false
       }),
       attachments: comment.attachments.map(doc => ({
@@ -375,7 +381,7 @@ exports.getHearingComments = async (req, res, next) => {
 // @access  Public
 exports.createHearingComment = async (req, res, next) => {
   try {
-    const { content, clientName, clientEmail, clientPhone, attachments } = req.body;
+    const { content, clientId, attachments } = req.body;
 
     // Validate the hearing exists
     const hearing = await Hearing.findByPk(req.params.id);
@@ -391,26 +397,22 @@ exports.createHearingComment = async (req, res, next) => {
 
     // If authenticated user (admin/advocate)
     if (req.user) {
-      commentData.createdBy = req.user.id;
+      commentData.adminId = req.user.id;
+      commentData.creatorType = req.user.role;
     } else {
-      // If client (unauthenticated)
-      if (!clientName || !clientEmail) {
+      // If client
+      
         return next(new ErrorResponse(
-          'Please provide name and email for client comment',
+          'Client ID is required',
           'VALIDATION_ERROR',
-          { required: ['clientName', 'clientEmail'] }
+          { required: ['clientId'] }
         ));
-      }
-      commentData.clientName = clientName;
-      commentData.clientEmail = clientEmail;
-      commentData.clientPhone = clientPhone;
     }
 
     const comment = await HearingComment.create(commentData);
 
     // Handle file uploads if present
     if (attachments && attachments.length > 0) {
-
       // Create document records
       await Promise.all(attachments.map(attachment =>
         HearingCommentDoc.create({
@@ -437,6 +439,12 @@ exports.createHearingComment = async (req, res, next) => {
           required: false
         },
         {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'name'],
+          required: false
+        },
+        {
           model: HearingCommentDoc,
           as: 'attachments',
           attributes: ['id', 'fileName', 'fileSize', 'fileType', 'filePath']
@@ -448,17 +456,13 @@ exports.createHearingComment = async (req, res, next) => {
       id: newComment.id.toString(),
       content: newComment.text,
       createdAt: newComment.createdAt,
-      // If it's an admin comment, include admin details
-      ...(newComment.user ? {
+      creatorType: newComment.creatorType,
+      ...(newComment.adminId ? {
         userId: newComment.user.id.toString(),
-        userName: newComment.user.name,
-        isAdmin: true
+        userName: newComment.user.name
       } : {
-        // If it's a client comment, include client details
-        clientName: newComment.clientName,
-        clientEmail: newComment.clientEmail,
-        clientPhone: newComment.clientPhone || '',
-        isAdmin: false
+        clientId: newComment.client.id.toString(),
+        clientName: newComment.client.name,
       }),
       attachments: newComment.attachments.map(doc => ({
         id: doc.id.toString(),

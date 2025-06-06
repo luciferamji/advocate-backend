@@ -17,29 +17,25 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: false
     },
-    createdBy: {
+    creatorType: {
+      type: DataTypes.ENUM('super-admin', 'advocate', 'client'),
+      allowNull: false
+    },
+    adminId: {
       type: DataTypes.UUID,
-      allowNull: true, // Changed to allow null for client comments
+      allowNull: true,
       references: {
         model: 'admin',
         key: 'id'
       }
     },
-    // New fields for client comments
-    clientName: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    clientEmail: {
-      type: DataTypes.STRING,
+    clientId: {
+      type: DataTypes.UUID,
       allowNull: true,
-      validate: {
-        isEmail: true
+      references: {
+        model: 'client',
+        key: 'id'
       }
-    },
-    clientPhone: {
-      type: DataTypes.STRING,
-      allowNull: true
     }
   }, {
     timestamps: true,
