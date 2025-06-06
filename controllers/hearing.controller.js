@@ -272,24 +272,54 @@ exports.updateHearing = async (req, res, next) => {
 // @route   DELETE /api/hearings/:id
 // @access  Private
 exports.deleteHearing = async (req, res, next) => {
+  const transaction = await sequelize.transaction();
+
   try {
-    const hearing = await Hearing.findByPk(req.params.id, {
-      include: [{ model: Case, as: 'case' }]
-    });
+    const hearing = await Hearing.findByPk(req.params.id, { transaction });
 
     if (!hearing) {
       return next(new ErrorResponse('Hearing not found', 'HEARING_NOT_FOUND', { id: req.params.id }));
     }
 
-    // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && hearing.case.advocateId !== req.user.id) {
+    if (req.user.role !== 'super-admin' && hearing.advocateId !== req.user.id) {
       return next(new ErrorResponse('Not authorized to delete this hearing', 'UNAUTHORIZED_ACCESS'));
     }
 
-    await hearing.destroy();
+    // 🎯 Get all hearing comments
+    const hearingComments = await HearingComment.findAll({
+      where: { hearingId: hearing.id },
+      attributes: ['id'],
+      transaction
+    });
+    const hearingCommentIds = hearingComments.map(hc => hc.id);
 
+    // 📂 Get hearing comment docs and delete files
+    const hearingDocs = await HearingCommentDoc.findAll({
+      where: { hearingCommentId: hearingCommentIds },
+      attributes: ['filePath'],
+      transaction
+    });
+
+    await HearingCommentDoc.destroy({
+      where: { hearingCommentId: hearingCommentIds },
+      transaction
+    });
+
+    hearingDocs.forEach(doc => deleteFile(doc.filePath.replace(/^\/+/, '')));
+
+    // 🗑 Delete hearing comments
+    await HearingComment.destroy({
+      where: { id: hearingCommentIds },
+      transaction
+    });
+
+    // 🗑 Delete the hearing itself
+    await hearing.destroy({ transaction });
+
+    await transaction.commit();
     res.status(200).end();
   } catch (error) {
+    await transaction.rollback();
     next(new ErrorResponse(error.message, 'HEARING_DELETE_ERROR'));
   }
 };
@@ -344,6 +374,7 @@ exports.getHearingComments = async (req, res, next) => {
       id: comment.id.toString(),
       content: comment.text,
       createdAt: comment.createdAt,
+      creatorType: comment.creatorType,
       ...(comment.user ? {
         userId: comment.user.id.toString(),
         userName: comment.user.name,
