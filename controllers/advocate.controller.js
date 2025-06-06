@@ -1,18 +1,24 @@
 const bcrypt = require('bcryptjs');
-const { Admin, Advocate, Case } = require('../models');
+const { Admin, Advocate, Case, Client, sequelize } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 const { sendEmail, emailTemplates } = require('../utils/email');
+
+
+const validateAdvocate = async (adminId) => {
+  const admin = await Admin.findOne({ where: { id: adminId, role: 'advocate' } });
+  return !!admin;
+};
 
 // @desc    Get all advocates
 // @route   GET /api/advocates
 // @access  Private/Super-Admin
 exports.getAdvocates = async (req, res, next) => {
   try {
-    const { 
-      page = 0, 
-      limit = 10, 
-      search = '', 
+    const {
+      page = 0,
+      limit = 10,
+      search = '',
       status = '',
       sortBy = 'name',
       sortOrder = 'asc'
@@ -21,7 +27,6 @@ exports.getAdvocates = async (req, res, next) => {
     const whereClause = {
       role: 'advocate'
     };
-
     if (status) {
       whereClause.status = status;
     }
@@ -150,10 +155,10 @@ exports.createAdvocate = async (req, res, next) => {
     }
 
     // Generate strong random password
-    const password = Math.random().toString(36).substring(2, 10) + 
-                    Math.random().toString(36).substring(2, 10) +
-                    '@' + Math.floor(Math.random() * 100);
-    
+    const password = Math.random().toString(36).substring(2, 10) +
+      Math.random().toString(36).substring(2, 10) +
+      '@' + Math.floor(Math.random() * 100);
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -300,5 +305,45 @@ exports.deleteAdvocate = async (req, res, next) => {
     res.status(200).end();
   } catch (error) {
     next(new ErrorResponse(error.message, 'ADVOCATE_DELETE_ERROR'));
+  }
+};
+
+exports.reassignAdvocateClients = async (req, res, next) => {
+  const { advocateId } = req.params;
+  const { newAdvocateId } = req.body;
+
+  const t = await sequelize.transaction();
+
+  try {
+    const isValid = await validateAdvocate(newAdvocateId);
+    if (!isValid) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Invalid advocate ID' });
+    }
+
+    const clients = await Client.findAll({ where: { createdBy: advocateId }, transaction: t });
+    if (clients.length === 0) {
+      await t.rollback();
+      return res.status(404).json({ message: 'No clients found for this advocate' });
+    }
+
+    const clientIds = clients.map(c => c.id);
+
+    await Client.update(
+      { createdBy: newAdvocateId },
+      { where: { createdBy: advocateId }, transaction: t }
+    );
+
+    await Case.update(
+      { advocateId: newAdvocateId },
+      { where: { clientId: clientIds }, transaction: t }
+    );
+
+    await t.commit();
+    res.status(200).json({ message: 'All clients and cases reassigned to new advocate' });
+  } catch (err) {
+    await t.rollback();
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
   }
 };

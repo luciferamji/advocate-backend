@@ -1,6 +1,12 @@
-const { Client, Case } = require('../models');
+const { Client, Case, Admin, sequelize } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
+
+const validateAdvocate = async (adminId) => {
+  const admin = await Admin.findOne({ where: { id: adminId, role: 'advocate' } });
+  return !!admin;
+};
+
 
 // @desc    Search clients
 // @route   GET /api/clients/search
@@ -53,7 +59,8 @@ exports.getClients = async (req, res, next) => {
     const {
       page = 0,
       limit = 10,
-      search = ''
+      search = '',
+      advocateId = '',
     } = req.query;
 
     const whereClause = {};
@@ -61,6 +68,11 @@ exports.getClients = async (req, res, next) => {
     // If not super-admin, only show own clients
     if (req.user.role !== 'super-admin') {
       whereClause.createdBy = req.user.id;
+    }
+    else {
+      if (advocateId) {
+        whereClause.createdBy = advocateId;
+      }
     }
 
     // Add search condition
@@ -122,9 +134,9 @@ exports.getClient = async (req, res, next) => {
     const client = await Client.findByPk(req.params.id, {
       include: [
         {
-          model: Case,
-          as: 'cases',
-          attributes: ['id', 'caseNumber', 'title', 'status', 'createdAt']
+          model: Admin,
+          as: 'admin',
+          attributes: ['id', 'name', 'email'],
         }
       ]
     });
@@ -145,13 +157,11 @@ exports.getClient = async (req, res, next) => {
       email: client.email || '',
       phone: client.phone || '',
       address: client.address || '',
-      cases: client.cases.map(caseItem => ({
-        id: caseItem.id.toString(),
-        caseNumber: caseItem.caseNumber,
-        title: caseItem.title,
-        status: caseItem.status,
-        createdAt: caseItem.createdAt
-      })),
+      createdBy: {
+        id: client.admin.id.toString(),
+        name: client.admin.name,
+        email: client.admin.email || ''
+      },
       createdAt: client.createdAt
     };
 
@@ -279,5 +289,47 @@ exports.deleteClient = async (req, res, next) => {
     res.status(200).end();
   } catch (error) {
     next(new ErrorResponse(error.message, 'CLIENT_DELETE_ERROR'));
+  }
+};
+
+
+exports.assignClientToAdvocate = async (req, res, next) => {
+  const { clientId } = req.params;
+  const { newAdvocateId } = req.body;
+
+  const t = await sequelize.transaction();
+
+  try {
+
+    // Check ownership if not super-admin
+    if (req.user.role !== 'super-admin') {
+      return next(new ErrorResponse('Not authorized to update this client', 'UNAUTHORIZED_ACCESS'));
+    }
+    // Validate new advocate
+    const isValid = await validateAdvocate(newAdvocateId);
+    if (!isValid) {
+      await t.rollback();
+      return res.status(400).json({ message: 'Invalid advocate ID' });
+    }
+
+    const client = await Client.findByPk(clientId, { transaction: t });
+    if (!client) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Client not found' });
+    }
+
+    await client.update({ createdBy: newAdvocateId }, { transaction: t });
+
+    await Case.update(
+      { advocateId: newAdvocateId },
+      { where: { clientId }, transaction: t }
+    );
+
+    await t.commit();
+    res.status(200).json({ message: 'Client and cases reassigned to new advocate' });
+  } catch (err) {
+    await t.rollback();
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
