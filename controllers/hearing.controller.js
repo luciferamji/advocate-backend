@@ -1,8 +1,9 @@
-const { Hearing, Case, Client, Admin, HearingComment, HearingCommentDoc } = require('../models');
+const { Hearing, Case, Client, Admin, HearingComment, HearingCommentDoc,sequelize } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 const { upload } = require('../utils/fileUpload');
 const { moveFileFromTemp } = require('../utils/fileTransfer');
+const { deleteFile } = require('../utils/fileDelete');
 
 // @desc    Get all hearings
 // @route   GET /api/hearings
