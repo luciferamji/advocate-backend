@@ -1,5 +1,3 @@
-const { all } = require("../routes/client.routes");
-
 module.exports = (sequelize, DataTypes) => {
 const Invoice = sequelize.define('invoice', {
     id: {
@@ -13,32 +11,27 @@ const Invoice = sequelize.define('invoice', {
         unique: true
     },
     clientId: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.UUID,
         allowNull: false,
         references: {
             model: 'client',
-            key: 'clientId'
+            key: 'id'
         }
     },
     advocateId: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.UUID,
         allowNull: false,
         references: {
             model: 'admin',
             key: 'id'
         }
     },
-    amountInWords: {
-        type: DataTypes.STRING,
+    createdAt: {
+        type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: ''
+        defaultValue: DataTypes.NOW
     },
-    details: {
-        type: DataTypes.JSON,
-        allowNull: false
-        // Example: [{ description: "Service A", amount: 100 }, { description: "Service B", amount: 200 }]
-    },
-    date: {
+    updatedAt: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW
@@ -46,7 +39,16 @@ const Invoice = sequelize.define('invoice', {
     dueDate: {
         type: DataTypes.DATE,
         allowNull: true
-    }
+    },
+    comments: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    status: {
+        type: DataTypes.ENUM('UNPAID', 'PAID', 'CANCELLED'),
+        allowNull: false,
+        defaultValue: 'UNPAID'
+    },
 }, {
     timestamps: true,
     tableName: 'invoice'
