@@ -1,7 +1,7 @@
-const { Case, Client, Admin, CaseComment, CaseCommentDoc } = require('../models');
+const { Case, Client, Admin, CaseComment, CaseCommentDoc, Hearing, HearingComment, HearingCommentDoc, sequelize } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
-const { upload } = require('../utils/fileUpload');
+const { deleteFile } = require('../utils/fileDelete');
 const { moveFileFromTemp } = require('../utils/fileTransfer');
 
 // @desc    Get all cases
@@ -252,23 +252,79 @@ exports.updateCase = async (req, res, next) => {
 // @desc    Delete case
 // @route   DELETE /api/cases/:id
 // @access  Private
+
 exports.deleteCase = async (req, res, next) => {
+  const transaction = await sequelize.transaction();
+
   try {
-    const caseItem = await Case.findByPk(req.params.id);
+    const caseItem = await Case.findByPk(req.params.id, { transaction });
 
     if (!caseItem) {
       return next(new ErrorResponse('Case not found', 'CASE_NOT_FOUND', { id: req.params.id }));
     }
 
-    // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && caseItem.advocateId !== req.user.id) {
       return next(new ErrorResponse('Not authorized to delete this case', 'UNAUTHORIZED_ACCESS'));
     }
 
-    await caseItem.destroy();
 
+    const hearings = await Hearing.findAll({
+      where: { caseId: caseItem.id },
+      attributes: ['id'],
+      transaction
+    });
+    const hearingIds = hearings.map(h => h.id);
+
+
+    const hearingComments = await HearingComment.findAll({
+      where: { hearingId: hearingIds },
+      attributes: ['id'],
+      transaction
+    });
+    const hearingCommentIds = hearingComments.map(hc => hc.id);
+
+
+    const hearingDocs = await HearingCommentDoc.findAll({
+      where: { hearingCommentId: hearingCommentIds },
+      attributes: ['filePath'],
+      transaction
+    });
+    await HearingCommentDoc.destroy({ where: { hearingCommentId: hearingCommentIds }, transaction });
+    hearingDocs.forEach(doc => deleteFile(doc.filePath.replace(/^\/+/, '')));
+
+
+    await HearingComment.destroy({ where: { id: hearingCommentIds }, transaction });
+
+
+    await Hearing.destroy({ where: { id: hearingIds }, transaction });
+
+
+    const caseComments = await CaseComment.findAll({
+      where: { caseId: caseItem.id },
+      attributes: ['id'],
+      transaction
+    });
+    const caseCommentIds = caseComments.map(cc => cc.id);
+
+
+    const caseDocs = await CaseCommentDoc.findAll({
+      where: { caseCommentId: caseCommentIds },
+      attributes: ['filePath'],
+      transaction
+    });
+    await CaseCommentDoc.destroy({ where: { caseCommentId: caseCommentIds }, transaction });
+    caseDocs.forEach(doc => deleteFile(doc.filePath.replace(/^\/+/, '')));
+
+
+    await CaseComment.destroy({ where: { id: caseCommentIds }, transaction });
+
+
+    await caseItem.destroy({ transaction });
+
+    await transaction.commit();
     res.status(200).end();
   } catch (error) {
+    await transaction.rollback();
     next(new ErrorResponse(error.message, 'CASE_DELETE_ERROR'));
   }
 };
