@@ -12,11 +12,11 @@ exports.protect = async (req, res, next) => {
         where: { sessionId },
         attributes: { exclude: ['password'] }
       });
-      
       if (user) {
         req.user = user;
         return next();
       }
+
     }
 
     // If no valid session, check for temporary token
@@ -32,7 +32,6 @@ exports.protect = async (req, res, next) => {
         return next();
       }
     }
-
     return res.status(401).json({
       success: false,
       message: 'Not authorized to access this route'
