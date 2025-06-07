@@ -1,4 +1,4 @@
-const { Client, Case, Admin, sequelize } = require('../models');
+const { Client, Case, Admin, sequelize, Invoice} = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 
@@ -321,6 +321,11 @@ exports.assignClientToAdvocate = async (req, res, next) => {
     await client.update({ createdBy: newAdvocateId }, { transaction: t });
 
     await Case.update(
+      { advocateId: newAdvocateId },
+      { where: { clientId }, transaction: t }
+    );
+
+    await Invoice.update(
       { advocateId: newAdvocateId },
       { where: { clientId }, transaction: t }
     );
