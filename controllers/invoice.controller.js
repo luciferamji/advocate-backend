@@ -1,7 +1,8 @@
-const { Invoice } = require('../models');
+const { Invoice, Client } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { generatePdf } = require('../utils/generatePdf');
 const { numberToIndianWords } = require('../utils/numberToWords');
+const { Op } = require('sequelize');
 
 // @desc    Create new invoice
 // @route   POST /api/invoices
@@ -115,25 +116,38 @@ exports.getInvoice = async (req, res) => {
 // @access  Private
 exports.getInvoices = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, clientId, advocateId } = req.query;
+    const { page = 1, limit = 10, status, clientId, search = '' } = req.query;
 
-    // Build filter object
-    const filter = {};
-    if (status) filter.status = status;
-    if (clientId) filter.clientId = clientId;
-    if (advocateId) filter.advocateId = advocateId;
-
+    const where = {};
+    if (status) where.status = status;
+    if (clientId) where.clientId = clientId;
     if (req.user.role !== 'super-admin') {
-      filter.advocateId = req.user.id;
+      where.advocateId = req.user.id;
+    }
+
+    if (search) {
+      where[Op.or] = [
+        { invoiceId: { [Op.iLike]: `%${search}%` } },
+        Sequelize.where(Sequelize.col('client.name'), {
+          [Op.iLike]: `%${search}%`
+        })
+      ];
     }
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const { rows: invoices, count: total } = await Invoice.findAndCountAll({
-      where: filter,
+      where,
       offset,
       limit: parseInt(limit),
       order: [['createdAt', 'DESC']],
+      include: [
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['name']
+        }
+      ]
     });
 
     res.status(200).json({
@@ -143,10 +157,11 @@ exports.getInvoices = async (req, res) => {
       totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
-    console.error("Get invoices error:", error);
+    console.error("Error fetching invoices:", error);
     res.status(500).json({ message: "Failed to get invoices" });
   }
 };
+
 
 // @desc    Update invoice by ID
 // @route   PUT /api/invoices/:id
