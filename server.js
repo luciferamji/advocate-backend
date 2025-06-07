@@ -81,3 +81,5 @@ const startServer = async () => {
 };
 
 startServer();
+
+require('./cron/nextDayHearingCron');

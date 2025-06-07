@@ -2,11 +2,11 @@ const nodemailer = require('nodemailer');
 
 const emailTemplates = {
   advocateWelcome: (name, email, password) => ({
-    subject: 'Welcome to Advocate Management System',
+    subject: 'Welcome to Lawfy',
     html: `
-      <h2>Welcome to Advocate Management System</h2>
+      <h2>Welcome to Lawfy</h2>
       <p>Dear ${name},</p>
-      <p>Your account has been created in the Advocate Management System. Here are your login credentials:</p>
+      <p>Your account has been created in Lawfy. Here are your login credentials:</p>
       <p><strong>Email:</strong> ${email}</p>
       <p><strong>Temporary Password:</strong> ${password}</p>
       <p>For security reasons, please change your password after your first login.</p>
@@ -33,7 +33,8 @@ const sendEmail = async (options) => {
     from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
     to: options.email,
     subject: options.subject,
-    html: options.html
+    html: options.html,
+    attachments: options.attachments || []
   };
 
   // Send email
