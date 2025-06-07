@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const { generateTempToken } = require('../utils/tokenHandler');
 const { moveFileFromTemp } = require('../utils/fileTransfer');
+const {generateDocumentUploadEmail} =require('../emailTemplates/otp');
 
 // @desc    Create document link
 // @route   POST /api/document-links
@@ -59,19 +60,16 @@ exports.createDocumentLink = async (req, res, next) => {
 
     // Send email with OTP
     const uploadUrl = `${process.env.FRONTEND_URL}/upload-documents/${link.id}`;
-    await sendEmail({
+    const mailConfig = generateDocumentUploadEmail({
       email: caseItem.client.email,
-      subject: 'Document Upload Request',
-      html: `
-        <h2>Document Upload Request</h2>
-        <p>You have received a request to upload documents for case: ${caseItem.caseNumber}</p>
-        <p><strong>Title:</strong> ${title}</p>
-        ${description ? `<p><strong>Description:</strong> ${description}</p>` : ''}
-        <p><strong>Upload Link:</strong> <a href="${uploadUrl}">${uploadUrl}</a></p>
-        <p><strong>OTP:</strong> ${link.plainOtp}</p>
-        <p>This link will expire in ${expiresIn} hours.</p>
-      `
+      caseNumber: caseItem.caseNumber,
+      title,
+      description,
+      uploadUrl,
+      plainOtp: link.plainOtp,
+      expiresIn
     });
+    await sendEmail(mailConfig);
 
     // Remove OTP from response
     const response = link.toJSON();
