@@ -1,10 +1,6 @@
-const path = require("path");
-const ejs = require("ejs");
-const fs = require("fs");
 const { generatePdf } = require("../utils/generatePdf");
 const { Invoice } = require("../models");
-const { sequelize } = require("../models");
-const numberToWords = require("number-to-words");
+const { numberToIndianWords } = require("../utils/numberToWords"); // Import the function
 
 // @desc    Create new invoice
 // @route   POST /api/invoices
@@ -20,6 +16,8 @@ exports.generateInvoice = async (req, res) => {
       clientContact,
       status,
       comments,
+      cgstAmount,
+      sgstAmount
     } = req.body;
 
     if (
@@ -52,9 +50,8 @@ exports.generateInvoice = async (req, res) => {
     const invoiceDate = new Date().toISOString().split("T")[0];
     const amount = Math.round(total);
 
-    const amountInWords =
-      numberToWords.toWords(amount).replace(/\b\w/g, (c) => c.toUpperCase()) +
-      " Only";
+
+    const amountInWords = `${numberToIndianWords(amount)} Only`;
 
     await Invoice.create({
       invoiceId,
@@ -67,6 +64,10 @@ exports.generateInvoice = async (req, res) => {
       status: status.toUpperCase(),
     });
 
+    const cgst = cgstAmount ?? 0;
+    const sgst = sgstAmount ?? 0;
+
+
     const invoiceData = {
       invoiceId,
       clientName,
@@ -75,7 +76,10 @@ exports.generateInvoice = async (req, res) => {
       dueDate,
       amountInWords,
       items,
-      total: amount,
+      total: amount-(cgst + sgst),
+      cgst,
+      sgst,
+      totalWithTax: amount,
     };
 
     const pdfBuffer = await generatePdf(invoiceData);
@@ -118,6 +122,10 @@ exports.getInvoices = async (req, res) => {
     if (clientId) filter.clientId = clientId;
     if (advocateId) filter.advocateId = advocateId;
 
+    if (req.user.role !== 'super-admin') {
+      filter.advocateId = req.user.id;
+    }
+
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const { rows: invoices, count: total } = await Invoice.findAndCountAll({
@@ -142,8 +150,17 @@ exports.getInvoices = async (req, res) => {
 // @desc    Update invoice by ID
 // @route   PUT /api/invoices/:id
 // @access  Private
-exports.updateInvoice = async (req, res) => {
+exports.updateInvoice = async (req, res, next) => {
   try {
+    const invoice = await Invoice.findByPk(req.params.id);
+
+    if (
+      req.user.role !== 'super-admin' ||
+      (invoice && invoice.advocateId !== req.user.id)
+    ) {
+      return next(new ErrorResponse('Not authorized to update this invoice', 'UNAUTHORIZED_ACCESS'));
+    }
+
     const [updated] = await Invoice.update(req.body, {
       where: { id: req.params.id }
     });
@@ -163,6 +180,9 @@ exports.updateInvoice = async (req, res) => {
 // @access  Private
 exports.deleteInvoice = async (req, res) => {
   try {
+    if (req.user.role !== 'super-admin') {
+      return next(new ErrorResponse('Not authorized to delete this invoice', 'UNAUTHORIZED_ACCESS'));
+    }
     const deleted = await Invoice.destroy({
       where: { id: req.params.id }
     });

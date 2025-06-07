@@ -4,100 +4,167 @@
   <meta charset="UTF-8">
   <title>Invoice - Lawfy & Co</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
+    * { box-sizing: border-box; }
     body {
-      font-family: 'Arial', sans-serif;
-      padding: 40px;
-      max-width: 800px;
+      font-family: 'Segoe UI', 'Arial', sans-serif;
+      padding: 36px 32px 40px 32px;
+      max-width: 820px;
       margin: auto;
-      color: #333;
-      background: #fff;
+      color: #232323;
+      background: #fafbfc;
+      font-size: 15px;
+      letter-spacing: 0.01em;
     }
-
     .header {
       text-align: center;
-      border-bottom: 2px solid #000;
-      padding-bottom: 10px;
+      border-bottom: 2.5px solid #1a237e;
+      padding-bottom: 12px;
+      margin-bottom: 12px;
     }
-
     .header h2 {
       margin: 0;
-      font-size: 24px;
-      letter-spacing: 1px;
+      font-size: 30px;
+      font-weight: 800;
+      color: #1a237e;
+      letter-spacing: 2px;
     }
-
     .office-address {
       font-size: 13px;
-      margin-top: 10px;
+      margin-top: 8px;
+      color: #444;
       white-space: pre-line;
+      font-weight: 500;
     }
-
     .invoice-title {
       text-align: center;
-      font-weight: bold;
-      font-size: 22px;
-      margin: 30px 0;
+      font-weight: 700;
+      font-size: 24px;
+      margin: 32px 0 24px 0;
       text-decoration: underline;
+      color: #263238;
+      letter-spacing: 1.5px;
     }
-
     .client-section {
-      margin-bottom: 25px;
+      margin-bottom: 28px;
+      padding: 12px 18px;
+      background: #f5f7fa;
+      border-radius: 7px;
+      border: 1px solid #e3e6ea;
     }
-
     .client-section p {
       margin: 2px 0;
+      font-size: 15px;
+      font-weight: 500;
+      color: #374151;
     }
-
     .details-section table {
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 20px;
-      font-size: 14px;
+      font-size: 15px;
+      background: #fff;
+      border-radius: 7px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px 0 #e3e6ea;
     }
-
     .details-section th, .details-section td {
-      border: 1px solid #999;
-      padding: 8px;
+      border: 1px solid #e3e6ea;
+      padding: 10px 8px;
     }
-
     .details-section th {
-      background-color: #f0f0f0;
+      background-color: #f0f4fa;
       text-align: left;
+      font-weight: 700;
+      color: #1a237e;
+      font-size: 15px;
+      letter-spacing: 0.5px;
     }
-
+    .details-section td {
+      font-weight: 500;
+      color: #232323;
+      background: #fff;
+    }
     .details-section td:last-child,
     .details-section th:last-child {
       text-align: right;
     }
-
     .totals {
       text-align: right;
-      margin-top: 20px;
-      font-weight: bold;
-      font-size: 15px;
+      margin-top: 24px;
+      font-weight: 600;
+      font-size: 16px;
+      color: #263238;
+      background: #f5f7fa;
+      border-radius: 7px;
+      padding: 18px 24px 12px 0;
+      border: 1px solid #e3e6ea;
+      box-shadow: 0 1px 4px 0 #e3e6ea;
+      page-break-inside: avoid;
     }
-
     .totals p {
-      margin: 5px 0;
+      margin: 7px 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: #263238;
     }
-
+    .tax-section {
+      text-align: right;
+      font-size: 14px;
+      margin-top: 8px;
+      margin-bottom: 0;
+      color: #374151;
+      font-weight: 500;
+    }
     .bank-details {
-      font-size: 13px;
-      margin-top: 30px;
-      line-height: 1.5;
+      font-size: 13.5px;
+      margin-top: 32px;
+      line-height: 1.7;
+      color: #374151;
+      background: #f5f7fa;
+      border-radius: 7px;
+      padding: 14px 18px;
+      border: 1px solid #e3e6ea;
+      font-weight: 500;
     }
-
+    .bank-details strong {
+      color: #1a237e;
+      font-weight: 700;
+      font-size: 14.5px;
+    }
     .signature {
       text-align: right;
-      margin-top: 50px;
-      font-weight: bold;
+      margin-top: 54px;
+      font-weight: 700;
+      color: #1a237e;
+      font-size: 16px;
     }
-
     .signature p {
       margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: #263238;
+    }
+    .item-name {
+      font-weight: 700;
+      color: #263238;
+      font-size: 14px;
+      margin-bottom: 2px;
+      display: block;
+      letter-spacing: 0.2px;
+    }
+    .item-desc {
+      color: #555;
+      font-size: 13.5px;
+      font-weight: 500;
+    }
+    @media print {
+      body {
+        background: #fff !important;
+        box-shadow: none !important;
+      }
+      .details-section table, .totals, .bank-details {
+        box-shadow: none !important;
+      }
     }
   </style>
 </head>
@@ -106,8 +173,8 @@
   <div class="header">
     <h2>LAWFY & CO</h2>
     <div class="office-address">
-      Kolkata Office: 4ES8B, Manicasadona, Newtown, Street No.-372, Kolkata – 700156, West Bengal<br>
-      Bangalore Office: 106, 1st Whitefield Main Road, Hoodi Circle, Bangalore 560048, Karnataka<br>
+      Kolkata Office: 4ES8B, Manicasadona, Newtown, Street No.-372, Kolkata - 700156, West Bengal<br>
+      Bangalore Office: 106, 1st Whitefield Main Road, Hoodi Circle, Bangalore - 560048, Karnataka<br>
       Email: ask@lawfyco.in | PH: 9147109222
     </div>
   </div>
@@ -141,16 +208,22 @@
     <table>
       <thead>
         <tr>
-          <th style="width: 10%">Sr.</th>
+          <th style="width: 8%">Sr.</th>
+          <th style="width: 40%">Name</th>
           <th>Description of Services</th>
-          <th style="width: 25%">Amount (INR)</th>
+          <th style="width: 20%">Amount (INR)</th>
         </tr>
       </thead>
       <tbody>
         <% items.forEach((item, index) => { %>
           <tr>
             <td><%= index + 1 %></td>
-            <td><%= item.description %></td>
+            <td>
+              <span class="item-name"><%= item.name %></span>
+            </td>
+            <td>
+              <span class="item-desc"><%= item.description %></span>
+            </td>
             <td><%= parseFloat(item.amount).toFixed(2) %></td>
           </tr>
         <% }) %>
@@ -159,24 +232,32 @@
   </div>
 
   <div class="totals">
-    <p>Round Off: ₹0.00</p>
-    <p>Total: ₹<%= total.toFixed(2) %></p>
+    <p>Subtotal: ₹<%= total ? total.toFixed(2) : '0.00' %></p>
+      <div class="tax-section">
+        <span>CGST: ₹<%= cgst ? cgst.toFixed(2) : '0.00' %></span>
+      </div>
+      <div class="tax-section">
+        <span>SGST : ₹<%= sgst ? sgst.toFixed(2) : '0.00' %></span>
+      </div>
+    <p>Total (Incl. Tax): ₹<%= totalWithTax.toFixed(2) %></p>
     <p>Rupees <%= amountInWords %></p>
   </div>
 
-  <div class="bank-details">
-    <strong>Bank Details:</strong><br>
-    PAN No.: AAMFL1888P<br>
-    Bank: ICICI Bank Ltd<br>
-    Account No.: 572205000063<br>
-    IFSC: ICIC0005722<br>
-    Account Holder: LAWFY & CO
-  </div>
+  <div style="display: flex; justify-content: space-between; gap: 32px; align-items: flex-start; margin-top: 32px; page-break-inside: avoid;">
+    <div class="bank-details" style="flex: 1; min-width: 260px; page-break-inside: avoid;">
+      <strong>Bank Details:</strong><br>
+      PAN No.: AAMFL1888P<br>
+      Bank: ICICI Bank Ltd<br>
+      Account No.: 572205000063<br>
+      IFSC: ICIC0005722<br>
+      Account Holder: LAWFY & CO
+    </div>
 
-  <div class="signature">
-    <p>For</p>
-    <p>LAWFY & CO</p><br><br>
-    <p>Authorized Signatory</p>
+    <div class="signature" style="flex: 1; min-width: 220px; page-break-inside: avoid;">
+      <p>For</p>
+      <p>LAWFY & CO</p>
+      <p>Authorized Signatory</p>
+    </div>
   </div>
 
 </body>
