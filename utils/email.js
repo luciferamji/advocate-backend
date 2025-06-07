@@ -1,20 +1,6 @@
 const nodemailer = require('nodemailer');
 
-const emailTemplates = {
-  advocateWelcome: (name, email, password) => ({
-    subject: 'Welcome to Lawfy',
-    html: `
-      <h2>Welcome to Lawfy</h2>
-      <p>Dear ${name},</p>
-      <p>Your account has been created in Lawfy. Here are your login credentials:</p>
-      <p><strong>Email:</strong> ${email}</p>
-      <p><strong>Temporary Password:</strong> ${password}</p>
-      <p>For security reasons, please change your password after your first login.</p>
-      <p>If you have any questions or need assistance, please contact the system administrator.</p>
-      <p>Best regards,<br>Admin Team</p>
-    `
-  })
-};
+
 
 const sendEmail = async (options) => {
   // Create transporter
@@ -42,6 +28,5 @@ const sendEmail = async (options) => {
 };
 
 module.exports = {
-  sendEmail,
-  emailTemplates
+  sendEmail
 };

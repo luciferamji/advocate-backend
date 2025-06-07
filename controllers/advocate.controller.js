@@ -2,7 +2,8 @@ const bcrypt = require('bcryptjs');
 const { Admin, Advocate, Case, Client, sequelize } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
-const { sendEmail, emailTemplates } = require('../utils/email');
+const { sendEmail} = require('../utils/email');
+const {advocateWelcome} = require('../emailTemplates/AdvocateOnboarding');
 
 
 const validateAdvocate = async (adminId) => {
@@ -181,12 +182,8 @@ exports.createAdvocate = async (req, res, next) => {
 
     // Send welcome email with credentials
     try {
-      const emailTemplate = emailTemplates.advocateWelcome(name, email, password);
-      await sendEmail({
-        email,
-        subject: emailTemplate.subject,
-        html: emailTemplate.html
-      });
+      const emailTemplate = advocateWelcome(name, email, password);
+      await sendEmail(emailTemplate);
     } catch (emailError) {
       // Log email error but don't stop the response
       console.error('Failed to send welcome email:', emailError);
