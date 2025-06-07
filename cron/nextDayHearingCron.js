@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const { Admin, Case, Hearing, Client } = require('../models');
 const { Op } = require('sequelize');
 const { sendEmail } = require('../utils/email');
-const {generateHearingEmail} = require('../emailTemplates/DailyHearing');
+const {generateHearingEmail} = require('../emailTemplates/dailyHearing');
 
 const sendHearingReminders = async () => {
     try {
