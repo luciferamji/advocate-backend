@@ -39,6 +39,15 @@ const Invoice = sequelize.define('invoice', {
         allowNull: false,
         defaultValue: 'UNPAID'
     },
+    paymentMode: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    transactionId: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        unique: true
+    },
 }, {
     timestamps: true,
     tableName: 'invoice'
