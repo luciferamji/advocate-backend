@@ -20,13 +20,13 @@
       border-bottom: 2.5px solid #1a237e;
       padding-bottom: 12px;
       margin-bottom: 12px;
+      position: relative;
     }
-    .header h2 {
-      margin: 0;
-      font-size: 30px;
-      font-weight: 800;
-      color: #1a237e;
-      letter-spacing: 2px;
+    .logo {
+      width: 110px;
+      height: auto;
+      display: block;
+      margin: 0 auto 8px auto;
     }
     .office-address {
       font-size: 13px;
@@ -125,24 +125,45 @@
       padding: 14px 18px;
       border: 1px solid #e3e6ea;
       font-weight: 500;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
     }
     .bank-details strong {
       color: #1a237e;
       font-weight: 700;
       font-size: 14.5px;
     }
-    .signature {
+    .bank-qr {
+      width: 90px;
+      height: 90px;
+      object-fit: contain;
+      border-radius: 6px;
+      border: 1px solid #e3e6ea;
+      background: #fff;
+      margin-left: 10px;
+    }
+    .signature-block {
       text-align: right;
       margin-top: 54px;
       font-weight: 700;
       color: #1a237e;
       font-size: 16px;
+      min-width: 220px;
+      page-break-inside: avoid;
     }
-    .signature p {
+    .signature-block p {
       margin: 0;
       font-size: 15px;
       font-weight: 600;
       color: #263238;
+    }
+    .signature-img {
+      width: 120px;
+      height: auto;
+      margin-bottom: 4px;
+      margin-right: 0;
+      display: inline-block;
     }
     .item-name {
       font-weight: 700;
@@ -165,13 +186,16 @@
       .details-section table, .totals, .bank-details {
         box-shadow: none !important;
       }
+      .bank-qr, .logo, .signature-img {
+        filter: none !important;
+      }
     }
   </style>
 </head>
 <body>
 
   <div class="header">
-    <h2>LAWFY & CO</h2>
+    <img src="<%= assetUrls.logo %>" alt="Lawfy & Co Logo" class="logo" />
     <div class="office-address">
       Kolkata Office: 4ES8B, Manicasadona, Newtown, Street No.-372, Kolkata - 700156, West Bengal<br>
       Bangalore Office: 106, 1st Whitefield Main Road, Hoodi Circle, Bangalore - 560048, Karnataka<br>
@@ -245,17 +269,21 @@
 
   <div style="display: flex; justify-content: space-between; gap: 32px; align-items: flex-start; margin-top: 32px; page-break-inside: avoid;">
     <div class="bank-details" style="flex: 1; min-width: 260px; page-break-inside: avoid;">
-      <strong>Bank Details:</strong><br>
-      PAN No.: AAMFL1888P<br>
-      Bank: ICICI Bank Ltd<br>
-      Account No.: 572205000063<br>
-      IFSC: ICIC0005722<br>
-      Account Holder: LAWFY & CO
+      <div>
+        <strong>Bank Details:</strong><br>
+        PAN No.: AAMFL1888P<br>
+        Bank: ICICI Bank Ltd<br>
+        Account No.: 572205000063<br>
+        IFSC: ICIC0005722<br>
+        Account Holder: LAWFY & CO
+      </div>
+      <img src="<%= assetUrls.bankQr %>" alt="Bank QR" class="bank-qr" />
     </div>
 
-    <div class="signature" style="flex: 1; min-width: 220px; page-break-inside: avoid;">
+    <div class="signature-block" style="flex: 1; min-width: 220px; page-break-inside: avoid;">
       <p>For</p>
       <p>LAWFY & CO</p>
+      <img src="<%= assetUrls.authorizedSign %>" alt="Authorized Signature" class="signature-img" /><br>
       <p>Authorized Signatory</p>
     </div>
   </div>
