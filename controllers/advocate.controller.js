@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { Admin, Advocate, Case, Client, sequelize } = require('../models');
+const { Admin, Advocate, Case, Client, sequelize, Invoice } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 const { sendEmail} = require('../utils/email');
@@ -334,6 +334,11 @@ exports.reassignAdvocateClients = async (req, res, next) => {
     await Case.update(
       { advocateId: newAdvocateId },
       { where: { clientId: clientIds }, transaction: t }
+    );
+
+  await Invoice.update(
+      { advocateId: newAdvocateId },
+      { where: { advocateId }, transaction: t }
     );
 
     await t.commit();

@@ -1,9 +1,9 @@
 module.exports = (sequelize, DataTypes) => {
 const Invoice = sequelize.define('invoice', {
     id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true
+      type: DataTypes.UUID,
+      primaryKey: true,
+      defaultValue: DataTypes.UUIDV4,
     },
     invoiceId: {
         type: DataTypes.STRING,
@@ -26,16 +26,6 @@ const Invoice = sequelize.define('invoice', {
             key: 'id'
         }
     },
-    createdAt: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: DataTypes.NOW
-    },
-    updatedAt: {
-        type: DataTypes.DATE,
-        allowNull: false,
-        defaultValue: DataTypes.NOW
-    },
     dueDate: {
         type: DataTypes.DATE,
         allowNull: true
@@ -53,6 +43,5 @@ const Invoice = sequelize.define('invoice', {
     timestamps: true,
     tableName: 'invoice'
 });
-  
   return Invoice;
 };
