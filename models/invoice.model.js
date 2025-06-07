@@ -53,6 +53,5 @@ const Invoice = sequelize.define('invoice', {
     timestamps: true,
     tableName: 'invoice'
 });
-  
   return Invoice;
 };
