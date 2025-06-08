@@ -46,7 +46,6 @@ const Invoice = sequelize.define('invoice', {
     transactionId: {
         type: DataTypes.STRING,
         allowNull: true,
-        unique: true
     },
     filePath: {
         type: DataTypes.STRING,

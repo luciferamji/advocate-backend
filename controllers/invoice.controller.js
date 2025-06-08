@@ -17,8 +17,6 @@ exports.generateInvoice = async (req, res) => {
       items,
       total,
       dueDate,
-      clientName,
-      clientContact,
       status,
       comments,
       cgstAmount,
@@ -29,8 +27,6 @@ exports.generateInvoice = async (req, res) => {
       !clientId ||
       !items?.length ||
       !total ||
-      !clientName ||
-      !clientContact ||
       !status
     ) {
       return next(
@@ -60,12 +56,12 @@ exports.generateInvoice = async (req, res) => {
 
     const cgst = cgstAmount ?? 0;
     const sgst = sgstAmount ?? 0;
-
+    const client = await Client.findByPk(clientId);
 
     const invoiceData = {
       invoiceId,
-      clientName,
-      clientContact,
+      clientName: client.name,
+      clientContact: client.contact,
       invoiceDate,
       dueDate,
       amountInWords,
@@ -85,7 +81,7 @@ exports.generateInvoice = async (req, res) => {
     await Invoice.create({
       invoiceId,
       clientId,
-      advocateId: req.user.id,
+      advocateId: client.createdBy,
       createdAt: new Date(),
       updatedAt: new Date(),
       dueDate: dueDate ? new Date(dueDate) : null,
@@ -176,10 +172,9 @@ exports.getInvoices = async (req, res) => {
 exports.updateInvoice = async (req, res, next) => {
   try {
     const invoice = await Invoice.findByPk(req.params.id);
-
     if (
-      req.user.role !== 'super-admin' ||
-      (invoice && invoice.advocateId !== req.user.id)
+      req.user.role !== 'super-admin' &&
+      invoice?.advocateId !== req.user.id
     ) {
       return next(new ErrorResponse('Not authorized to update this invoice', 'UNAUTHORIZED_ACCESS'));
     }
