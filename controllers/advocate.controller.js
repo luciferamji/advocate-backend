@@ -3,7 +3,7 @@ const { Admin, Advocate, Case, Client, sequelize, Invoice } = require('../models
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 const { sendEmail} = require('../utils/email');
-const {advocateWelcome} = require('../emailTemplates/AdvocateOnboarding');
+const {advocateWelcome} = require('../emailTemplates/advocateOnboarding');
 
 
 const validateAdvocate = async (adminId) => {
