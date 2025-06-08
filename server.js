@@ -25,7 +25,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Static files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // Routes
 app.use('/api/auth', require('./routes/auth.routes'));
@@ -43,6 +43,9 @@ app.use('/api/download', require('./routes/download.routes'));
 app.use('/api/invoices', require('./routes/invoice.routes'));
 app.use('/api/document-links', require('./routes/documentLink.routes'));
 
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
 // Error handler middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
