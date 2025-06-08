@@ -28,6 +28,9 @@ exports.login = async (req, res, next) => {
       return next(new ErrorResponse('Invalid credentials', 'INVALID_CREDENTIALS'));
     }
     
+    if( user.status !== 'active') {
+      return next(new ErrorResponse('Your account is not active. Please contact support.', 'ACCOUNT_INACTIVE'));
+    }
     // Check if password matches
     const isMatch = await bcrypt.compare(password, user.password);
     
@@ -92,6 +95,7 @@ exports.getMe = async (req, res, next) => {
       email: user.email,
       role: user.role,
       phone: user.phone,
+      active: user.status,
       advocate: user.advocate ? {
         barNumber: user.advocate.barNumber,
         specialization: user.advocate.specialization
