@@ -48,6 +48,10 @@ const Invoice = sequelize.define('invoice', {
         allowNull: true,
         unique: true
     },
+    filePath: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
 }, {
     timestamps: true,
     tableName: 'invoice'

@@ -5,8 +5,8 @@ const { v4: uuidv4 } = require('uuid');
 const ErrorResponse = require('../utils/errorHandler');
 const { upload } = require('../utils/fileUpload');
 
-const CHUNKS_DIR = path.join(process.env.UPLOAD_DIR || '../uploads', 'temp','chunks');
-const UPLOADS_DIR = path.join(process.env.UPLOAD_DIR || '../uploads','temp');
+const CHUNKS_DIR = path.join(process.env.UPLOAD_DIR || '../uploads', 'temp', 'chunks');
+const UPLOADS_DIR = path.join(process.env.UPLOAD_DIR || '../uploads', 'temp');
 
 // @desc    Check if chunk exists
 // @route   GET /api/upload/chunk
@@ -78,9 +78,12 @@ exports.completeUpload = async (req, res, next) => {
     if (!identifier || !filename || !totalSize || !totalChunks) {
       return next(new ErrorResponse('Missing required parameters', 'INVALID_REQUEST'));
     }
-
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf'];
+    const fileExt = path.extname(filename).toLowerCase();
+    if (!allowedExtensions.includes(fileExt)) {
+      return next(new ErrorResponse('Invalid file type. Only images and PDFs are allowed.', 'INVALID_FILE_TYPE'));
+    }
     const fileId = uuidv4();
-    const fileExt = path.extname(filename);
     const finalFilename = `${fileId}${fileExt}`;
     const finalPath = path.join(UPLOADS_DIR, finalFilename);
 
@@ -125,7 +128,7 @@ exports.completeUpload = async (req, res, next) => {
 };
 
 exports.serveStaticFile = (req, res, next) => {
-  const filename = req.params.filename; 
+  const filename = req.params.filename;
   const filePath = path.resolve(__dirname, '..', process.env.UPLOAD_DIR, filename);
   // Check if file exists
   fs.access(filePath, fs.constants.F_OK, (err) => {

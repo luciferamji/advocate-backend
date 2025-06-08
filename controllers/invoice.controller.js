@@ -3,6 +3,9 @@ const ErrorResponse = require('../utils/errorHandler');
 const { generatePdf } = require('../utils/generatePdf');
 const { numberToIndianWords } = require('../utils/numberToWords');
 const { Op } = require('sequelize');
+const { v4: uuidv4 } = require('uuid');
+const path = require('path');
+const fs = require('fs-extra');
 
 // @desc    Create new invoice
 // @route   POST /api/invoices
@@ -51,20 +54,9 @@ exports.generateInvoice = async (req, res) => {
     const invoiceId = `LAWFY-${Date.now().toString()}`;
     const invoiceDate = new Date().toISOString().split("T")[0];
     const amount = Math.round(total);
-
+    const fileName = `${uuidv4()}.pdf`;
 
     const amountInWords = `${numberToIndianWords(amount)} Only`;
-
-    await Invoice.create({
-      invoiceId,
-      clientId,
-      advocateId: req.user.id,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      dueDate: dueDate ? new Date(dueDate) : null,
-      comments: comments || null,
-      status: status.toUpperCase(),
-    });
 
     const cgst = cgstAmount ?? 0;
     const sgst = sgstAmount ?? 0;
@@ -78,14 +70,29 @@ exports.generateInvoice = async (req, res) => {
       dueDate,
       amountInWords,
       items,
-      total: amount-(cgst + sgst),
+      total: amount - (cgst + sgst),
       cgst,
       sgst,
       totalWithTax: amount,
     };
 
     const pdfBuffer = await generatePdf(invoiceData);
+    const uploadsDir = path.join(process.env.UPLOAD_DIR || '../uploads');
+    const filePath = path.join(uploadsDir, fileName);
+    await fs.ensureDir(uploadsDir);
+    await fs.writeFile(filePath, pdfBuffer);
 
+    await Invoice.create({
+      invoiceId,
+      clientId,
+      advocateId: req.user.id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      dueDate: dueDate ? new Date(dueDate) : null,
+      comments: comments || null,
+      status: status.toUpperCase(),
+      filePath: fileName,
+    });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", "inline; filename=invoice.pdf");
     res.status(200).end(pdfBuffer);

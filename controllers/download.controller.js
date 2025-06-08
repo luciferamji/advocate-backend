@@ -51,7 +51,7 @@ exports.downloadFile = async (req, res, next) => {
       }
     }
 
-    const filePath = path.join(process.env.UPLOAD_DIR || 'uploads', file.filePath);
+    const filePath = path.join(process.env.UPLOAD_DIR || '../uploads', file.filePath);
 
     // Check if file exists
     if (!fs.existsSync(filePath)) {
