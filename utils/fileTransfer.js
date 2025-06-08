@@ -8,14 +8,15 @@ const fs = require('fs-extra');
 exports.moveFileFromTemp = async (finalPath) => {
   try {
     const fileName = path.basename(finalPath);
-    const sourcePath = path.join(__dirname, '..', 'uploads', 'temp', fileName);
-    const destinationPath = path.join(__dirname, '..', 'uploads', fileName);
+    const sourcePath = path.join(__dirname, '..', process.env.UPLOAD_DIR, 'temp', fileName);
+    const destinationPath = path.join(__dirname, '..', process.env.UPLOAD_DIR, fileName);
 
     await fs.ensureDir(path.dirname(destinationPath));
     await fs.move(sourcePath, destinationPath, { overwrite: true });
 
     return { success: true, path: destinationPath };
   } catch (error) {
+    console.log('Error moving file:', error);
     return { success: false, error: error.message };
   }
 };

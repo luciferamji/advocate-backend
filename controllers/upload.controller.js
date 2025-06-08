@@ -5,8 +5,8 @@ const { v4: uuidv4 } = require('uuid');
 const ErrorResponse = require('../utils/errorHandler');
 const { upload } = require('../utils/fileUpload');
 
-const CHUNKS_DIR = path.join(process.env.UPLOAD_DIR || 'uploads', 'temp','chunks');
-const UPLOADS_DIR = path.join(process.env.UPLOAD_DIR || 'uploads','temp');
+const CHUNKS_DIR = path.join(process.env.UPLOAD_DIR || '../uploads', 'temp','chunks');
+const UPLOADS_DIR = path.join(process.env.UPLOAD_DIR || '../uploads','temp');
 
 // @desc    Check if chunk exists
 // @route   GET /api/upload/chunk
@@ -117,9 +117,26 @@ exports.completeUpload = async (req, res, next) => {
       fileName: filename,
       fileSize: totalSize,
       fileType,
-      url: `/uploads/${finalFilename}`
+      url: `${finalFilename}`
     });
   } catch (error) {
     next(new ErrorResponse(error.message, 'UPLOAD_COMPLETION_ERROR'));
   }
+};
+
+exports.serveStaticFile = (req, res, next) => {
+  const filename = req.params.filename; 
+  const filePath = path.resolve(__dirname, '..', process.env.UPLOAD_DIR, filename);
+  // Check if file exists
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        return next(err);
+      }
+    });
+  });
 };
