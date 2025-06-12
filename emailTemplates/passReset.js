@@ -1,8 +1,8 @@
 
-exports.advocateWelcome = (name, email, password) => {
+exports.passReset = (name, email, password) => {
     return ({
         email,
-        subject: 'Welcome to Lawfy',
+        subject: 'Password Reset For Lawfy & Co',
         html: `
 <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; border: 1px solid #ddd; background-color: #f9f9f9;">
   <div style="text-align: center; margin-bottom: 30px;">
@@ -13,12 +13,13 @@ exports.advocateWelcome = (name, email, password) => {
 
   <p style="font-size: 16px; color: #444;">Dear <strong>${name}</strong>,</p>
 
-  <p style="font-size: 15px; color: #444;">Your account has been successfully created in <strong>Lawfy</strong>. Below are your login credentials:</p>
+  <p style="font-size: 15px; color: #444;">Your account password has been successfully reset in <strong>Lawfy</strong>. Below are your login credentials:</p>
 
   <div style="background: #fff; padding: 15px; border: 1px solid #ccc; margin: 15px 0;">
     <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
-    <p style="margin: 5px 0;"><strong>🔒Password:</strong> ${password}</p>
+    <p style="margin: 5px 0;"><strong>Password:</strong> ${password}</p>
   </div>
+
 
   <p style="font-size: 15px; color: #444;">If you have any questions or need assistance, feel free to contact the system administrator.</p>
 

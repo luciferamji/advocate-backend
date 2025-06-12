@@ -2,6 +2,8 @@ const bcrypt = require('bcryptjs');
 const { Admin, Advocate } = require('../models');
 const { sendTokenResponse } = require('../utils/tokenHandler');
 const ErrorResponse = require('../utils/errorHandler');
+const { sendEmail } = require('../utils/email');
+const { passReset } = require('../emailTemplates/passReset');
 
 // @desc    Login user
 // @route   POST /api/auth/login
@@ -9,12 +11,12 @@ const ErrorResponse = require('../utils/errorHandler');
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    
+
     // Validate email & password
     if (!email || !password) {
       return next(new ErrorResponse('Please provide email and password', 'INVALID_CREDENTIALS'));
     }
-    
+
     // Check for user
     const user = await Admin.findOne({
       where: { email },
@@ -23,24 +25,24 @@ exports.login = async (req, res, next) => {
         attributes: ['barNumber', 'specialization']
       }]
     });
-    
+
     if (!user) {
       return next(new ErrorResponse('Invalid credentials', 'INVALID_CREDENTIALS'));
     }
-    
-    if( user.status !== 'active') {
+
+    if (user.status !== 'active') {
       return next(new ErrorResponse('Your account is not active. Please contact support.', 'ACCOUNT_INACTIVE'));
     }
     // Check if password matches
     const isMatch = await bcrypt.compare(password, user.password);
-    
+
     if (!isMatch) {
       return next(new ErrorResponse('Invalid credentials', 'INVALID_CREDENTIALS'));
     }
-    
+
     // Generate session and send response
     const sessionId = await sendTokenResponse(user, 200, res);
-    
+
     // Update user's sessionId in database
     await user.update({ sessionId });
   } catch (error) {
@@ -65,7 +67,7 @@ exports.logout = async (req, res, next) => {
       secure: false,
       sameSite: 'strict'
     });
-    
+
     res.status(200).end();
   } catch (error) {
     next(new ErrorResponse(error.message, 'LOGOUT_ERROR'));
@@ -84,11 +86,11 @@ exports.getMe = async (req, res, next) => {
         attributes: ['barNumber', 'specialization']
       }]
     });
-    
+
     if (!user) {
       return next(new ErrorResponse('User not found', 'USER_NOT_FOUND'));
     }
-    
+
     res.status(200).json({
       id: user.id.toString(),
       name: user.name,
@@ -112,22 +114,22 @@ exports.getMe = async (req, res, next) => {
 exports.updateDetails = async (req, res, next) => {
   try {
     const { name, phone, barNumber, specialization } = req.body;
-    
+
     const user = await Admin.findByPk(req.user.id, {
       include: [{
         model: Advocate,
         required: false
       }]
     });
-    
+
     if (!user) {
       return next(new ErrorResponse('User not found', 'USER_NOT_FOUND'));
     }
-    
+
     // Update basic details
     user.name = name || user.name;
     user.phone = phone || user.phone;
-    
+
     // Update advocate details if applicable
     if (user.role === 'advocate' && (barNumber || specialization)) {
       if (user.advocate) {
@@ -143,9 +145,9 @@ exports.updateDetails = async (req, res, next) => {
         });
       }
     }
-    
+
     await user.save();
-    
+
     // Fetch updated user
     const updatedUser = await Admin.findByPk(user.id, {
       attributes: { exclude: ['password', 'sessionId'] },
@@ -154,7 +156,7 @@ exports.updateDetails = async (req, res, next) => {
         attributes: ['barNumber', 'specialization']
       }]
     });
-    
+
     res.status(200).json({
       id: updatedUser.id.toString(),
       name: updatedUser.name,
@@ -177,30 +179,30 @@ exports.updateDetails = async (req, res, next) => {
 exports.updatePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    
+
     if (!currentPassword || !newPassword) {
       return next(new ErrorResponse('Please provide both current and new password', 'INVALID_PASSWORD_DATA'));
     }
-    
+
     const user = await Admin.findByPk(req.user.id);
-    
+
     if (!user) {
       return next(new ErrorResponse('User not found', 'USER_NOT_FOUND'));
     }
-    
+
     // Check current password
     const isMatch = await bcrypt.compare(currentPassword, user.password);
-    
+
     if (!isMatch) {
       return next(new ErrorResponse('Current password is incorrect', 'INVALID_CURRENT_PASSWORD'));
     }
-    
+
     // Hash new password
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
-    
+
     await user.save();
-    
+
     res.status(200).json({
       id: user.id.toString(),
       name: user.name,
@@ -216,3 +218,43 @@ exports.updatePassword = async (req, res, next) => {
     next(new ErrorResponse(error.message, 'PASSWORD_UPDATE_ERROR'));
   }
 };
+
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return next(new ErrorResponse('Please provide an email address', 'EMAIL_REQUIRED'));
+    }
+
+    const user = await Admin.findOne({ where: { email } });
+
+    if (!user) {
+      return next(new ErrorResponse('No user found with this email', 'USER_NOT_FOUND'));
+    }
+
+    const password = Math.random().toString(36).substring(2, 10) +
+      Math.random().toString(36).substring(2, 10) +
+      '@' + Math.floor(Math.random() * 100);
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    user.password = hashedPassword;
+    await user.save();
+    try {
+      const emailTemplate = passReset(user.name, email, password);
+      await sendEmail(emailTemplate);
+    } catch (emailError) {
+      // Log email error but don't stop the response
+      console.error('Failed to send password reset email:', emailError);
+    }
+
+
+    res.status(200).json({
+      success: true,
+      data: 'Email sent with password reset instructions'
+    });
+  } catch (error) {
+    next(new ErrorResponse(error.message, 'FORGOT_PASSWORD_ERROR'));
+  }
+}
