@@ -23,11 +23,23 @@ exports.generatePdf = async (data) => {
     { async: true }
   );
 
-  const browser = await puppeteer.launch({
-    headless: "new",
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    pipe: true,
-  });
+const browser = await puppeteer.launch({
+  headless: "new",
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-accelerated-2d-canvas",
+    "--disable-gpu",
+    "--no-first-run",
+    "--no-zygote",
+    "--single-process",
+    "--disable-background-networking",
+    "--enable-features=NetworkService",
+  ],
+  pipe: true,
+  protocolTimeout: 60000, // increase to 60 seconds
+});
 
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: "networkidle0" });
