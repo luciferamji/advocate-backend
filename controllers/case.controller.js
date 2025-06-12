@@ -538,3 +538,45 @@ exports.createCaseComment = async (req, res, next) => {
     next(new ErrorResponse(error.message, 'COMMENT_CREATE_ERROR'));
   }
 };
+
+exports.deleteCaseComment = async (req, res, next) => {
+  const transaction = await sequelize.transaction();
+  try {
+    const comment = await CaseComment.findByPk(req.params.commentId, {
+      include: [
+        {
+          model: CaseCommentDoc,
+          as: 'attachments',
+          attributes: ['id', 'filePath']
+        }
+      ],
+      transaction
+    });
+
+    if (!comment) {
+      return next(new ErrorResponse('Comment not found', 'COMMENT_NOT_FOUND', { id: req.params.commentId }));
+    }
+
+    // Check ownership
+    if (req.user.role !== 'super-admin') {
+      return next(new ErrorResponse('Not authorized to delete this comment', 'UNAUTHORIZED_ACCESS'));
+    }
+
+    // Delete attachments
+    if (comment.attachments && comment.attachments.length > 0) {
+      await CaseCommentDoc.destroy({
+        where: { caseCommentId: comment.id },
+        transaction
+      });
+      comment.attachments.forEach(doc => deleteFile(doc.filePath.replace(/^\/+/, '')));
+    }
+
+    await comment.destroy({ transaction });
+
+    await transaction.commit();
+    res.status(204).end();
+  } catch (error) {
+    await transaction.rollback();
+    next(new ErrorResponse(error.message, 'COMMENT_DELETE_ERROR'));
+  }
+};

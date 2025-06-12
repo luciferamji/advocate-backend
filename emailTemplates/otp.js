@@ -1,4 +1,4 @@
-exports.generateDocumentUploadEmail = ({ email, caseNumber, title, description, uploadUrl, plainOtp, expiresIn })=> {
+exports.generateDocumentUploadEmail = ({ email, caseNumber, title, description, uploadUrl, plainOtp, expiresIn, creatorEmail })=> {
   return {
     email,
     subject: '📤 Document Upload Request',
@@ -36,6 +36,7 @@ exports.generateDocumentUploadEmail = ({ email, caseNumber, title, description, 
         path: './assets/logo.png',
         cid: 'logo'
       }
-    ]
+    ],
+    cc: creatorEmail ? [creatorEmail] : []
   };
 }

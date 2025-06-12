@@ -6,11 +6,15 @@ const {
   updateCase,
   deleteCase,
   getCaseComments,
-  createCaseComment
+  createCaseComment,
+  deleteCaseComment
 } = require('../controllers/case.controller');
 const { protect } = require('../middleware/auth.middleware');
 
 const router = express.Router();
+
+router.route('/comments/:commentId')
+  .delete(protect, deleteCaseComment);
 
 // Protected routes
 router.route('/')
@@ -24,7 +28,8 @@ router.route('/:id')
 
 // Public routes for comments
 router.route('/:id/comments')
-  .get(protect,getCaseComments)
-  .post(protect,createCaseComment);
+  .get(protect, getCaseComments)
+  .post(protect, createCaseComment);
+
 
 module.exports = router;

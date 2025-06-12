@@ -1,4 +1,4 @@
-const { Hearing, Case, Client, Admin, HearingComment, HearingCommentDoc,sequelize } = require('../models');
+const { Hearing, Case, Client, Admin, HearingComment, HearingCommentDoc, sequelize } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 const { upload } = require('../utils/fileUpload');
@@ -433,12 +433,12 @@ exports.createHearingComment = async (req, res, next) => {
       commentData.creatorType = req.user.role;
     } else {
       // If client
-      
-        return next(new ErrorResponse(
-          'Client ID is required',
-          'VALIDATION_ERROR',
-          { required: ['clientId'] }
-        ));
+
+      return next(new ErrorResponse(
+        'Client ID is required',
+        'VALIDATION_ERROR',
+        { required: ['clientId'] }
+      ));
     }
 
     const comment = await HearingComment.create(commentData);
@@ -506,5 +506,50 @@ exports.createHearingComment = async (req, res, next) => {
     });
   } catch (error) {
     next(new ErrorResponse(error.message, 'COMMENT_CREATE_ERROR'));
+  }
+};
+
+exports.deleteHearingComment = async (req, res, next) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const comment = await HearingComment.findByPk(req.params.commentId, {
+      include: [
+        {
+          model: HearingCommentDoc,
+          as: 'attachments',
+          attributes: ['id', 'filePath']
+        }
+      ],
+      transaction
+    });
+
+    if (!comment) {
+      return next(new ErrorResponse('Comment not found', 'COMMENT_NOT_FOUND', { id: req.params.id }));
+    }
+
+    // Check ownership if not super-admin
+    if (req.user.role !== 'super-admin') {
+      return next(new ErrorResponse('Not authorized to delete this comment', 'UNAUTHORIZED_ACCESS'));
+    }
+
+    if (comment.attachments && comment.attachments.length > 0) {
+      await HearingCommentDoc.destroy({
+        where: { hearingCommentId: comment.id },
+        transaction
+      });
+      for (const attachment of comment.attachments) {
+        deleteFile(attachment.filePath.replace(/^\/+/, ''));
+      }
+    }
+
+    // Delete the comment
+    await comment.destroy({ transaction });
+
+    await transaction.commit();
+    res.status(200).end();
+  } catch (error) {
+    await transaction.rollback();
+    next(new ErrorResponse(error.message, 'COMMENT_DELETE_ERROR'));
   }
 };

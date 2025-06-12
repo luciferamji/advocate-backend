@@ -6,11 +6,15 @@ const {
   updateHearing,
   deleteHearing,
   getHearingComments,
-  createHearingComment
+  createHearingComment,
+  deleteHearingComment
 } = require('../controllers/hearing.controller');
 const { protect } = require('../middleware/auth.middleware');
 
 const router = express.Router();
+
+router.route('/comments/:commentId')
+  .delete(protect, deleteHearingComment);
 
 // Protected routes
 router.route('/')
