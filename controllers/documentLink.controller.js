@@ -1,11 +1,11 @@
-const { DocumentLink, Case, Hearing, Client, CaseComment, HearingComment,CaseCommentDoc ,HearingCommentDoc } = require('../models');
+const { DocumentLink, Case, Hearing, Client, CaseComment, HearingComment, CaseCommentDoc, HearingCommentDoc } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { sendEmail } = require('../utils/email');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const { generateTempToken } = require('../utils/tokenHandler');
 const { moveFileFromTemp } = require('../utils/fileTransfer');
-const {generateDocumentUploadEmail} =require('../emailTemplates/otp');
+const { generateDocumentUploadEmail } = require('../emailTemplates/otp');
 
 // @desc    Create document link
 // @route   POST /api/document-links
@@ -59,7 +59,7 @@ exports.createDocumentLink = async (req, res, next) => {
     });
 
     // Send email with OTP
-    const uploadUrl = `${process.env.FRONTEND_URL}/upload-documents/${link.id}`;
+    const uploadUrl = `${process.env.FRONTEND_URL}/upload/${link.id}`;
     const mailConfig = generateDocumentUploadEmail({
       email: caseItem.client.email,
       caseNumber: caseItem.caseNumber,
@@ -67,7 +67,8 @@ exports.createDocumentLink = async (req, res, next) => {
       description,
       uploadUrl,
       plainOtp: link.plainOtp,
-      expiresIn
+      expiresIn,
+      creatorEmail: req.user.email
     });
     await sendEmail(mailConfig);
 
