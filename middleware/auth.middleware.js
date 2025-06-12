@@ -3,41 +3,52 @@ const { verifyTempToken } = require('../utils/tokenHandler');
 
 exports.protect = async (req, res, next) => {
   try {
-    // First check for regular session
     const sessionId = req.cookies.session;
 
-    if (sessionId) {
-      // Get user from session
-      const user = await Admin.findOne({
-        where: { sessionId },
-        attributes: { exclude: ['password'] }
-      });
-      if (user) {
-        req.user = user;
-        return next();
-      }
-
+    if (!sessionId) {
+      return res.status(401).json({ success: false, message: 'No session provided' });
     }
 
-    // If no valid session, check for temporary token
-    const tempToken = req.cookies.temp_token;
-
-    if (tempToken) {
-      const decoded = verifyTempToken(tempToken);
-      if (decoded && decoded.linkId) {
-        req.tempUser = {
-          linkId: decoded.linkId,
-          isTemp: true
-        };
-        return next();
-      }
-    }
-    return res.status(401).json({
-      success: false,
-      message: 'Not authorized to access this route'
+    const user = await Admin.findOne({
+      where: { sessionId },
+      attributes: { exclude: ['password'] }
     });
+
+    if (!user || user.status !== 'active') {
+      return res.status(401).json({ success: false, message: 'Invalid session or user inactive' });
+    }
+
+    req.user = user;
+    next();
   } catch (error) {
     next(error);
+  }
+};
+
+
+
+exports.protectTemp = (req, res, next) => {
+  try {
+    const tempToken = req.cookies.temp_token;
+
+    if (!tempToken) {
+      return res.status(401).json({ success: false, message: 'No temp token provided' });
+    }
+
+    const decoded = verifyTempToken(tempToken);
+
+    if (!decoded || !decoded.linkId) {
+      return res.status(401).json({ success: false, message: 'Invalid temp token' });
+    }
+
+    req.tempUser = {
+      linkId: decoded.linkId,
+      isTemp: true
+    };
+
+    next();
+  } catch (error) {
+    return res.status(401).json({ success: false, message: 'Invalid or expired temp token' });
   }
 };
 
