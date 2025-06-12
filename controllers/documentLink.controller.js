@@ -241,9 +241,6 @@ exports.createComment = async (req, res, next) => {
     }
 
     const { comment, attachments } = req.body;
-    if (!comment) {
-      return next(new ErrorResponse('Comment is required', 'VALIDATION_ERROR'));
-    }
 
     // Create comment based on whether it's for a case or hearing
     if (link.hearingId) {
