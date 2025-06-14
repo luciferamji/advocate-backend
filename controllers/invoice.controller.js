@@ -19,9 +19,9 @@ exports.generateInvoice = async (req, res) => {
       dueDate,
       status,
       comments,
-      cgstAmount,
-      sgstAmount,
-      igstAmount,
+      cgst,
+      sgst,
+      igst,
       clientGstNo,
     } = req.body;
 
@@ -51,14 +51,12 @@ exports.generateInvoice = async (req, res) => {
 
     const invoiceId = `LAWFY-${Date.now().toString()}`;
     const invoiceDate = new Date().toISOString().split("T")[0];
-    const amount = Math.round(total);
+    const amount = Number(parseFloat(total).toFixed(2));
     const fileName = `${uuidv4()}.pdf`;
-
+    const cgstN = cgst ? Number(parseFloat(cgst).toFixed(2)) : 0;
+    const sgstN = sgst ? Number(parseFloat(sgst).toFixed(2)) : 0;
+    const igstN = igst ? Number(parseFloat(igst).toFixed(2)) : 0;
     const amountInWords = `${numberToIndianWords(amount)} Only`;
-
-    const cgst = cgstAmount ?? 0;
-    const sgst = sgstAmount ?? 0;
-    const igst = igstAmount ?? 0;
     const client = await Client.findByPk(clientId);
 
     const invoiceData = {
@@ -70,11 +68,11 @@ exports.generateInvoice = async (req, res) => {
       dueDate,
       amountInWords,
       items,
-      total: amount - (cgst + sgst + igst),
-      isGst: cgst > 0 || sgst > 0 || igst > 0,
-      cgst,
-      sgst,
-      igst,
+      total: amount - (cgstN + sgstN + igstN),
+      isGst: cgstN > 0 || sgstN > 0 || igstN > 0,
+      cgst: cgstN,
+      sgst: sgstN,
+      igst: igstN,
       totalWithTax: amount,
       clientGstNo
     };
