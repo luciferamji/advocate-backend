@@ -205,7 +205,7 @@ exports.verifyOtp = async (req, res, next) => {
     res.cookie('temp_token', tempToken, {
       expires: new Date(link.expiresAt),
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false,
       sameSite: 'strict'
     });
 
