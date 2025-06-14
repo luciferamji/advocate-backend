@@ -1,10 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Invoice - Lawfy & Co</title>
   <style>
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: 'Segoe UI', 'Arial', sans-serif;
       padding: 36px 32px 40px 32px;
@@ -15,6 +19,7 @@
       font-size: 15px;
       letter-spacing: 0.01em;
     }
+
     .header {
       text-align: center;
       border-bottom: 2.5px solid #1a237e;
@@ -22,12 +27,14 @@
       margin-bottom: 12px;
       position: relative;
     }
+
     .logo {
       width: 110px;
       height: auto;
       display: block;
       margin: 0 auto 8px auto;
     }
+
     .office-address {
       font-size: 13px;
       margin-top: 8px;
@@ -35,6 +42,7 @@
       white-space: pre-line;
       font-weight: 500;
     }
+
     .invoice-title {
       text-align: center;
       font-weight: 700;
@@ -44,6 +52,7 @@
       color: #263238;
       letter-spacing: 1.5px;
     }
+
     .client-section {
       margin-bottom: 28px;
       padding: 12px 18px;
@@ -51,12 +60,14 @@
       border-radius: 7px;
       border: 1px solid #e3e6ea;
     }
+
     .client-section p {
       margin: 2px 0;
       font-size: 15px;
       font-weight: 500;
       color: #374151;
     }
+
     .details-section table {
       width: 100%;
       border-collapse: collapse;
@@ -67,10 +78,13 @@
       overflow: hidden;
       box-shadow: 0 1px 4px 0 #e3e6ea;
     }
-    .details-section th, .details-section td {
+
+    .details-section th,
+    .details-section td {
       border: 1px solid #e3e6ea;
       padding: 10px 8px;
     }
+
     .details-section th {
       background-color: #f0f4fa;
       text-align: left;
@@ -79,15 +93,18 @@
       font-size: 15px;
       letter-spacing: 0.5px;
     }
+
     .details-section td {
       font-weight: 500;
       color: #232323;
       background: #fff;
     }
+
     .details-section td:last-child,
     .details-section th:last-child {
       text-align: right;
     }
+
     .totals {
       text-align: right;
       margin-top: 24px;
@@ -101,12 +118,14 @@
       box-shadow: 0 1px 4px 0 #e3e6ea;
       page-break-inside: avoid;
     }
+
     .totals p {
       margin: 7px 0;
       font-size: 15px;
       font-weight: 600;
       color: #263238;
     }
+
     .tax-section {
       text-align: right;
       font-size: 14px;
@@ -115,6 +134,7 @@
       color: #374151;
       font-weight: 500;
     }
+
     .bank-details {
       font-size: 13.5px;
       margin-top: 32px;
@@ -129,20 +149,23 @@
       align-items: flex-start;
       gap: 14px;
     }
+
     .bank-details strong {
       color: #1a237e;
       font-weight: 700;
       font-size: 14.5px;
     }
+
     .bank-qr {
-      width: 90px;
-      height: 90px;
+      width: 200px;
+      height: 200px;
       object-fit: contain;
       border-radius: 6px;
       border: 1px solid #e3e6ea;
       background: #fff;
       margin-left: 10px;
     }
+
     .signature-block {
       text-align: right;
       margin-top: 54px;
@@ -152,12 +175,14 @@
       min-width: 220px;
       page-break-inside: avoid;
     }
+
     .signature-block p {
       margin: 0;
       font-size: 15px;
       font-weight: 600;
       color: #263238;
     }
+
     .signature-img {
       width: 120px;
       height: auto;
@@ -165,6 +190,7 @@
       margin-right: 0;
       display: inline-block;
     }
+
     .item-name {
       font-weight: 700;
       color: #263238;
@@ -173,25 +199,34 @@
       display: block;
       letter-spacing: 0.2px;
     }
+
     .item-desc {
       color: #555;
       font-size: 13.5px;
       font-weight: 500;
     }
+
     @media print {
       body {
         background: #fff !important;
         box-shadow: none !important;
       }
-      .details-section table, .totals, .bank-details {
+
+      .details-section table,
+      .totals,
+      .bank-details {
         box-shadow: none !important;
       }
-      .bank-qr, .logo, .signature-img {
+
+      .bank-qr,
+      .logo,
+      .signature-img {
         filter: none !important;
       }
     }
   </style>
 </head>
+
 <body>
 
   <div class="header">
@@ -199,7 +234,7 @@
     <div class="office-address">
       Kolkata Office: 4ES8B, Manicasadona, Newtown, Street No.-372, Kolkata - 700156, West Bengal<br>
       Bangalore Office: 106, 1st Whitefield Main Road, Hoodi Circle, Bangalore - 560048, Karnataka<br>
-      Email: ask@lawfyco.in | PH: 9147109222
+      Email: ask@lawfyco.in | PH: 9147109222 | <%= isGst ? 'GSTIN: XXXXXXXXX' : '' %>
     </div>
   </div>
 
@@ -207,21 +242,36 @@
 
   <div class="client-section">
     <p><strong>To:</strong></p>
-    <p><%= clientName %></p>
-    <p>Contact: <%= clientContact %></p>
+    <p>
+      <%= clientName %>
+    </p>
+    <p>Contact: <%= clientContact %>
+    </p>
+    <p>Address: <%= clientAddress %>
+    </p>
+    <% if(isGst) { %>
+      <p>GST No: <%= clientGstNo %>
+      </p>
+      <% } %>
   </div>
 
   <div class="details-section">
     <table>
       <tr>
         <th>Invoice No.</th>
-        <td><%= invoiceId %></td>
+        <td>
+          <%= invoiceId %>
+        </td>
         <th>Date</th>
-        <td><%= invoiceDate %></td>
+        <td>
+          <%= invoiceDate %>
+        </td>
       </tr>
       <tr>
         <th>Due Date</th>
-        <td><%= dueDate %></td>
+        <td>
+          <%= dueDate %>
+        </td>
         <th>Created By</th>
         <td>LAWFY & CO</td>
       </tr>
@@ -239,35 +289,56 @@
         </tr>
       </thead>
       <tbody>
-        <% items.forEach((item, index) => { %>
+        <% items.forEach((item, index)=> { %>
           <tr>
-            <td><%= index + 1 %></td>
             <td>
-              <span class="item-name"><%= item.name %></span>
+              <%= index + 1 %>
             </td>
             <td>
-              <span class="item-desc"><%= item.description %></span>
+              <span class="item-name">
+                <%= item.name %>
+              </span>
             </td>
-            <td><%= parseFloat(item.amount).toFixed(2) %></td>
+            <td>
+              <span class="item-desc">
+                <%= item.description %>
+              </span>
+            </td>
+            <td>
+              <%= parseFloat(item.amount).toFixed(2) %>
+            </td>
           </tr>
-        <% }) %>
+          <% }) %>
       </tbody>
     </table>
   </div>
 
   <div class="totals">
-    <p>Subtotal: ₹<%= total ? total.toFixed(2) : '0.00' %></p>
+    <% if(isGst) { %>
+      <p>Subtotal: ₹<%= total ? total.toFixed(2) : '0.00' %>
+      </p>
+
       <div class="tax-section">
         <span>CGST: ₹<%= cgst ? cgst.toFixed(2) : '0.00' %></span>
       </div>
       <div class="tax-section">
         <span>SGST : ₹<%= sgst ? sgst.toFixed(2) : '0.00' %></span>
       </div>
-    <p>Total (Incl. Tax): ₹<%= totalWithTax.toFixed(2) %></p>
-    <p>Rupees <%= amountInWords %></p>
+      <div class="tax-section">
+        <span>IGST : ₹<%= igst ? igst.toFixed(2) : '0.00' %></span>
+      </div>
+      <div class="tax-section">
+        <span>IGST : ₹<%= igst ? igst.toFixed(2) : '0.00' %></span>
+      </div>
+      <% } %>
+        <p>Total <%= isGst ? '(Incl. Tax): ₹' + totalWithTax.toFixed(2) : '₹' + totalWithTax.toFixed(2) %>
+        </p>
+        <p>Rupees <%= amountInWords %>
+        </p>
   </div>
 
-  <div style="display: flex; justify-content: space-between; gap: 32px; align-items: flex-start; margin-top: 32px; page-break-inside: avoid;">
+  <div
+    style="display: flex; justify-content: space-between; gap: 32px; align-items: flex-start; margin-top: 32px; page-break-inside: avoid;">
     <div class="bank-details" style="flex: 1; min-width: 260px; page-break-inside: avoid;">
       <div>
         <strong>Bank Details:</strong><br>
@@ -289,4 +360,5 @@
   </div>
 
 </body>
+
 </html>

@@ -20,7 +20,9 @@ exports.generateInvoice = async (req, res) => {
       status,
       comments,
       cgstAmount,
-      sgstAmount
+      sgstAmount,
+      igstAmount,
+      clientGstNo,
     } = req.body;
 
     if (
@@ -56,20 +58,25 @@ exports.generateInvoice = async (req, res) => {
 
     const cgst = cgstAmount ?? 0;
     const sgst = sgstAmount ?? 0;
+    const igst = igstAmount ?? 0;
     const client = await Client.findByPk(clientId);
 
     const invoiceData = {
       invoiceId,
       clientName: client.name,
-      clientContact: client.contact,
+      clientContact: client.phone,
+      clientAddress: client.address,
       invoiceDate,
       dueDate,
       amountInWords,
       items,
-      total: amount - (cgst + sgst),
+      total: amount - (cgst + sgst + igst),
+      isGst: cgst > 0 || sgst > 0 || igst > 0,
       cgst,
       sgst,
+      igst,
       totalWithTax: amount,
+      clientGstNo
     };
 
     const pdfBuffer = await generatePdf(invoiceData);
