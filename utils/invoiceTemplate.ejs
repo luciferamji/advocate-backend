@@ -319,16 +319,13 @@
       </p>
 
       <div class="tax-section">
-        <span>CGST: ₹<%= cgst ? cgst.toFixed(2) : '0.00' %></span>
+        <span>CGST@9%: ₹<%= cgst ? cgst.toFixed(2) : '0.00' %></span>
       </div>
       <div class="tax-section">
-        <span>SGST : ₹<%= sgst ? sgst.toFixed(2) : '0.00' %></span>
+        <span>SGST@9%: ₹<%= sgst ? sgst.toFixed(2) : '0.00' %></span>
       </div>
       <div class="tax-section">
-        <span>IGST : ₹<%= igst ? igst.toFixed(2) : '0.00' %></span>
-      </div>
-      <div class="tax-section">
-        <span>IGST : ₹<%= igst ? igst.toFixed(2) : '0.00' %></span>
+        <span>IGST@18%: ₹<%= igst ? igst.toFixed(2) : '0.00' %></span>
       </div>
       <% } %>
         <p>Total <%= isGst ? '(Incl. Tax): ₹' + totalWithTax.toFixed(2) : '₹' + totalWithTax.toFixed(2) %>
