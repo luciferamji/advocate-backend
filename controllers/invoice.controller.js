@@ -144,11 +144,16 @@ exports.getInvoices = async (req, res) => {
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
+    const order =
+      status === 'UNPAID'
+        ? [['dueDate', 'ASC']]
+        : [['createdAt', 'DESC']];
+
     const { rows: invoices, count: total } = await Invoice.findAndCountAll({
       where,
       offset,
       limit: parseInt(limit),
-      order: [['createdAt', 'DESC']],
+      order,
       include: [
         {
           model: Client,
