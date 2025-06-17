@@ -7,6 +7,11 @@ module.exports = (sequelize, DataTypes) => {
     },
     caseNumber: {
       type: DataTypes.STRING,
+      allowNull: true,
+      unique: true
+    },
+    filingNumber: {
+      type: DataTypes.STRING,
       allowNull: false,
       unique: true
     },
@@ -28,7 +33,7 @@ module.exports = (sequelize, DataTypes) => {
       references: {
         model: 'admin',
         key: 'id'
-      } 
+      }
     },
     courtName: {
       type: DataTypes.STRING,
@@ -46,6 +51,6 @@ module.exports = (sequelize, DataTypes) => {
     timestamps: true,
     tableName: 'case'
   });
-  
+
   return Case;
 };

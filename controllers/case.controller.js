@@ -25,7 +25,8 @@ exports.getCases = async (req, res, next) => {
     if (search) {
       whereClause[Op.or] = [
         { caseNumber: { [Op.iLike]: `%${search}%` } },
-        { title: { [Op.iLike]: `%${search}%` } }
+        { title: { [Op.iLike]: `%${search}%` } },
+        {filingNumber: { [Op.iLike]: `%${search}%` } },
       ];
     }
 
@@ -68,6 +69,7 @@ exports.getCases = async (req, res, next) => {
       return {
         id: caseItem.id.toString(),
         caseNumber: caseItem.caseNumber,
+        filingNumber: caseItem.filingNumber,
         title: caseItem.title,
         description: caseItem.description,
         clientId: caseItem.client?.id?.toString() || null,
@@ -134,6 +136,7 @@ exports.getCase = async (req, res, next) => {
     res.status(200).json({
       id: caseItem.id.toString(),
       caseNumber: caseItem.caseNumber,
+      filingNumber: caseItem.filingNumber,
       title: caseItem.title,
       description: caseItem.description,
       clientId: caseItem.client.id.toString(),
@@ -158,26 +161,42 @@ exports.createCase = async (req, res, next) => {
       title,
       caseNumber,
       clientId,
-      clientName,
       courtName,
       status,
       description,
-      nextHearing
+      nextHearing,
+      filingNumber
     } = req.body;
 
     // Validate required fields
-    if (!title || !caseNumber || !clientId || !courtName) {
+    if (!title || !filingNumber || !clientId || !courtName) {
       return next(new ErrorResponse(
         'Please provide all required fields',
         'VALIDATION_ERROR',
-        { required: ['title', 'caseNumber', 'clientId', 'courtName'] }
+        { required: ['title', 'filingNumber', 'clientId', 'courtName'] }
       ));
     }
 
-    // Check if case number exists
-    const existingCase = await Case.findOne({ where: { caseNumber } });
-    if (existingCase) {
-      return next(new ErrorResponse('Case number already exists', 'CASE_NUMBER_EXISTS', { caseNumber }));
+    // Check if filing number already exists
+    const existingFiling = await Case.findOne({ where: { filingNumber } });
+    if (existingFiling) {
+      return next(new ErrorResponse(
+        'Filing number already exists',
+        'FILING_NUMBER_EXISTS',
+        { filingNumber }
+      ));
+    }
+
+    // Check if case number already exists (if provided)
+    if (caseNumber) {
+      const existingCaseNumber = await Case.findOne({ where: { caseNumber } });
+      if (existingCaseNumber) {
+        return next(new ErrorResponse(
+          'Case number already exists',
+          'CASE_NUMBER_EXISTS',
+          { caseNumber }
+        ));
+      }
     }
 
     // Check if client exists and get the advocate ID
@@ -191,19 +210,20 @@ exports.createCase = async (req, res, next) => {
       return next(new ErrorResponse('Not authorized to create case for this client', 'UNAUTHORIZED_ACCESS'));
     }
 
-    // Create case with advocate ID from client's creator
+    // Create the case
     const caseItem = await Case.create({
       title,
-      caseNumber,
+      caseNumber: caseNumber || null,
+      filingNumber,
       clientId,
       courtName,
       description,
       status: status || 'OPEN',
       nextHearing: nextHearing || null,
-      advocateId: client.createdBy // Set advocateId from client's creator
+      advocateId: client.createdBy
     });
 
-    // Fetch created case with client details
+    // Fetch with client details
     const newCase = await Case.findByPk(caseItem.id, {
       include: [{
         model: Client,
@@ -218,6 +238,7 @@ exports.createCase = async (req, res, next) => {
         id: newCase.id.toString(),
         title: newCase.title,
         caseNumber: newCase.caseNumber,
+        filingNumber: newCase.filingNumber,
         clientId: newCase.client.id.toString(),
         clientName: newCase.client.name,
         courtName: newCase.courtName,
@@ -231,6 +252,7 @@ exports.createCase = async (req, res, next) => {
     next(new ErrorResponse(error.message, 'CASE_CREATE_ERROR'));
   }
 };
+
 
 // @desc    Update case
 // @route   PUT /api/cases/:id
