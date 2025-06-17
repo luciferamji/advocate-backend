@@ -124,7 +124,7 @@ exports.getInvoice = async (req, res) => {
 // @access  Private
 exports.getInvoices = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, clientId, search = '' } = req.query;
+    const { page = 1, limit = 10, status, clientId, search = '', sortField = 'createdAt', sortOrder = 'DESC' } = req.query;
 
     const where = {};
     if (status) where.status = status;
@@ -144,11 +144,12 @@ exports.getInvoices = async (req, res) => {
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const order = status === 'UNPAID'
-      ? [['dueDate', 'ASC']]
-      : [['createdAt', 'DESC']];
+    const allowedFields = ['createdAt', 'dueDate'];
+    const orderField = allowedFields.includes(sortField) ? sortField : 'createdAt';
+    const orderDirection = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    let{ rows: invoices, count: total } = await Invoice.findAndCountAll({
+    order = [[orderField, orderDirection]];
+    let { rows: invoices, count: total } = await Invoice.findAndCountAll({
       where,
       offset,
       limit: parseInt(limit),
@@ -157,24 +158,10 @@ exports.getInvoices = async (req, res) => {
         {
           model: Client,
           as: 'client',
-          attributes: ['name']
+          attributes: ['name', 'phone'],
         }
       ]
     });
-    if (clientId) {
-        invoices = invoices.sort((a, b) => {
-        const aIsUnpaid = a.status === 'UNPAID';
-        const bIsUnpaid = b.status === 'UNPAID';
-
-        if (aIsUnpaid !== bIsUnpaid) {
-          return aIsUnpaid ? -1 : 1; // unpaid first
-        }
-
-        const aDate = aIsUnpaid ? new Date(a.dueDate) : new Date(a.createdAt);
-        const bDate = bIsUnpaid ? new Date(b.dueDate) : new Date(b.createdAt);
-        return aDate - bDate;
-      });
-    }
     res.status(200).json({
       invoices,
       total,
