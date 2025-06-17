@@ -1,4 +1,4 @@
-const { Invoice, Client } = require('../models');
+const { Invoice, Client,Sequelize } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { generatePdf } = require('../utils/generatePdf');
 const { numberToIndianWords } = require('../utils/numberToWords');
