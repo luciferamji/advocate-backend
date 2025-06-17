@@ -1,4 +1,4 @@
-const { Invoice, Client,Sequelize } = require('../models');
+const { Invoice, Client, Sequelize } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { generatePdf } = require('../utils/generatePdf');
 const { numberToIndianWords } = require('../utils/numberToWords');
@@ -144,12 +144,11 @@ exports.getInvoices = async (req, res) => {
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const order =
-      status === 'UNPAID'
-        ? [['dueDate', 'ASC']]
-        : [['createdAt', 'DESC']];
+    const order = status === 'UNPAID'
+      ? [['dueDate', 'ASC']]
+      : [['createdAt', 'DESC']];
 
-    const { rows: invoices, count: total } = await Invoice.findAndCountAll({
+    let{ rows: invoices, count: total } = await Invoice.findAndCountAll({
       where,
       offset,
       limit: parseInt(limit),
@@ -162,7 +161,20 @@ exports.getInvoices = async (req, res) => {
         }
       ]
     });
+    if (clientId) {
+        invoices = invoices.sort((a, b) => {
+        const aIsUnpaid = a.status === 'UNPAID';
+        const bIsUnpaid = b.status === 'UNPAID';
 
+        if (aIsUnpaid !== bIsUnpaid) {
+          return aIsUnpaid ? -1 : 1; // unpaid first
+        }
+
+        const aDate = aIsUnpaid ? new Date(a.dueDate) : new Date(a.createdAt);
+        const bDate = bIsUnpaid ? new Date(b.dueDate) : new Date(b.createdAt);
+        return aDate - bDate;
+      });
+    }
     res.status(200).json({
       invoices,
       total,
