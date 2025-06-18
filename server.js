@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? 'http://150.241.247.100:5000' // Replace with your production frontend URL
+    ? 'https://lawfypro.lawfyco.com/' 
     : 'http://localhost:5173',
   credentials: true,
 }));
