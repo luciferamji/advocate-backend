@@ -24,7 +24,7 @@ exports.generatePdf = async (data) => {
   );
 
 const browser = await puppeteer.launch({
-  headless: "new", // or 'true' if you're not on latest Puppeteer
+  headless: "new",
   args: [
     "--no-sandbox",
     "--disable-setuid-sandbox",
@@ -33,10 +33,12 @@ const browser = await puppeteer.launch({
     "--disable-gpu",
     "--no-first-run",
     "--no-zygote",
+    "--single-process",
     "--disable-background-networking",
     "--enable-features=NetworkService",
   ],
-  protocolTimeout: 60000,
+  pipe: true,
+  protocolTimeout: 60000, // increase to 60 seconds
 });
 
   const page = await browser.newPage();
