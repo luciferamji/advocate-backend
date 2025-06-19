@@ -314,24 +314,27 @@
   </div>
 
   <div class="totals">
-    <% if(isGst) { %>
+    <% if (isGst) { %>
       <p>Subtotal: ₹<%= total ? total.toFixed(2) : '0.00' %>
       </p>
 
-      <div class="tax-section">
-        <span>CGST@9%: ₹<%= cgst ? cgst.toFixed(2) : '0.00' %></span>
-      </div>
-      <div class="tax-section">
-        <span>SGST@9%: ₹<%= sgst ? sgst.toFixed(2) : '0.00' %></span>
-      </div>
-      <div class="tax-section">
-        <span>IGST@18%: ₹<%= igst ? igst.toFixed(2) : '0.00' %></span>
-      </div>
-      <% } %>
-        <p>Total <%= isGst ? '(Incl. Tax): ₹' + totalWithTax.toFixed(2) : '₹' + totalWithTax.toFixed(2) %>
-        </p>
-        <p>Rupees <%= amountInWords %>
-        </p>
+      <% if (igst && igst> 0) { %>
+        <div class="tax-section">
+          <span>IGST@18%: ₹<%= igst.toFixed(2) %></span>
+        </div>
+        <% } else { %>
+          <div class="tax-section">
+            <span>CGST@9%: ₹<%= cgst ? cgst.toFixed(2) : '0.00' %></span>
+          </div>
+          <div class="tax-section">
+            <span>SGST@9%: ₹<%= sgst ? sgst.toFixed(2) : '0.00' %></span>
+          </div>
+          <% } %>
+            <% } %>
+              <p>Total <%= isGst ? '(Incl. Tax): ₹' + totalWithTax.toFixed(2) : '₹' + totalWithTax.toFixed(2) %>
+              </p>
+              <p>Rupees <%= amountInWords %>
+              </p>
   </div>
 
   <div
