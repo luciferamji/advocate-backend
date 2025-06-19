@@ -77,7 +77,7 @@ exports.generateInvoice = async (req, res) => {
       clientGstNo
     };
 
-    const pdfBuffer = await generatePdf(invoiceData);
+    const pdfBuffer = await generatePdf(invoiceData, 'invoiceTemplate.ejs');
     const uploadsDir = path.join(process.env.UPLOAD_DIR || '../uploads');
     const filePath = path.join(uploadsDir, fileName);
     await fs.ensureDir(uploadsDir);

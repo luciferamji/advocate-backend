@@ -1,6 +1,7 @@
 const { Case, Client, Hearing } = require('../models');
 const { Op } = require('sequelize');
 const ErrorResponse = require('../utils/errorHandler');
+const { generatePdf } = require('../utils/generatePdf');
 
 // @desc    Get dashboard statistics
 // @route   GET /api/dashboard/stats
@@ -106,5 +107,67 @@ exports.getRecentItems = async (req, res, next) => {
     });
   } catch (error) {
     next(new ErrorResponse(error.message, 'DASHBOARD_RECENT_ERROR'));
+  }
+};
+
+exports.downloadTodayHearingsPdf = async (req, res, next) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];;
+
+    const whereClause = {
+
+    };
+
+    if (req.user.role !== 'super-admin') {
+      whereClause['advocateId'] = req.user.id;
+    }
+
+    const hearings = await Hearing.findAll({
+      where: {
+        date: today
+      },
+      include: [{
+        model: Case,
+        as: 'case',
+        where: whereClause,
+        attributes: ['id', 'title', 'caseNumber'],
+        include: [
+          {
+            model: Client,
+            as: 'client',
+            attributes: ['id', 'name', 'phone']
+          }
+        ]
+      }],
+      order: [['date', 'ASC'], ['time', 'ASC']]
+    });
+
+    if (hearings.length === 0) {
+      return res.status(404).json({ message: 'No hearings scheduled for today' });
+    }
+
+    const data = {
+      hearings: hearings.map(h => ({
+        id: h.id.toString(),
+        caseId: h.case.id.toString(),
+        caseName: h.case.title,
+        clientPhone: h.case.client.phone.toString(),
+        clientName: h.case.client.name,
+        date: h.date,
+        time: h.time,
+        courtName: h.courtName,
+        purpose: h.purpose,
+        judge: h.judge
+      })),
+      name: req.user.name || 'Advocate',
+      today: today,
+    };
+
+    const pdfBuffer = await generatePdf(data, 'dailyHearingTemplate.ejs');
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "inline; filename=hearing.pdf");
+    res.status(200).end(pdfBuffer);
+  } catch (error) {
+    next(new ErrorResponse(error.message, 'DASHBOARD_TODAY_HEARINGS_PDF_ERROR'));
   }
 };

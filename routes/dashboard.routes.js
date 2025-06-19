@@ -1,7 +1,8 @@
 const express = require('express');
 const { 
   getDashboardStats, 
-  getRecentItems 
+  getRecentItems,
+  downloadTodayHearingsPdf
 } = require('../controllers/dashboard.controller');
 const { protect } = require('../middleware/auth.middleware');
 
@@ -11,5 +12,6 @@ router.use(protect);
 
 router.get('/stats', getDashboardStats);
 router.get('/recent', getRecentItems);
+router.get('/hearing/download', downloadTodayHearingsPdf);
 
 module.exports = router;

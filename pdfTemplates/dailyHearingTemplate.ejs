@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <style>
+
+    </style>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 30px;
+            color: #333;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header img {
+            max-width: 150px;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            color: #2e5aac;
+            margin-bottom: 10px;
+        }
+
+
+        .case-block strong {
+            display: inline-block;
+            width: 130px;
+        }
+
+        .footer {
+            margin-top: 40px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .case-block {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin: 20px 0;
+            background-color: #fafafa;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .case-header {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2e5aac;
+            margin-bottom: 10px;
+        }
+
+        .case-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .case-table td {
+            padding: 4px 8px;
+            vertical-align: top;
+        }
+
+        .case-table td:first-child {
+            width: 120px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .case-table td:last-child {
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <img src="<%= assetUrls.logo %>" alt="Lawfy & Co" />
+        <h2>Hearing Schedule for <%= today %>
+        </h2>
+    </div>
+
+    <p>Dear <strong>
+            <%= name %>
+        </strong>,</p>
+    <p>Below are your scheduled hearings for Today:</p>
+
+    <% hearings.forEach((h, index)=> { %>
+        <div class="case-block">
+            <div class="case-header">
+                <span class="case-index">Hearing <%= index + 1 %></span>
+            </div>
+            <table class="case-table">
+                <tr>
+                    <td><strong>📌 Case:</strong></td>
+                    <td>
+                        <%= h.caseName %>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>👤 Client:</strong></td>
+                    <td>
+                        <%= h.clientName %>
+                    </td>
+                </tr>
+                                <tr>
+                    <td><strong>👤 Client Phone:</strong></td>
+                    <td>
+                        <%= h.clientPhone %>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>🕒 Time:</strong></td>
+                    <td>
+                        <%= h.time %>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>🏛 Court:</strong></td>
+                    <td>
+                        <%= h.courtName %>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>📄 Purpose:</strong></td>
+                    <td>
+                        <%= h.purpose || 'N/A' %>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>⚖️ Judge:</strong></td>
+                    <td>
+                        <%= h.judge || 'N/A' %>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <% }) %>
+
+            <div class="footer">
+                Best regards,<br />
+                <strong>Lawfy & Co</strong>
+            </div>
+</body>
+
+</html>
