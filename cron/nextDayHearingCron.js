@@ -31,8 +31,6 @@ const sendHearingReminders = async () => {
             ],
             order: [['time', 'ASC']]
         });
-
-        console.log(`Found ${hearings.length} hearings for tomorrow (${formattedDate})`);
         // Use a Map for grouping by advocateId
         const advocateMap = new Map();
 

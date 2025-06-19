@@ -10,7 +10,7 @@ const encodeImageToBase64 = (relativePath) => {
   return `data:image/${ext};base64,${base64}`;
 };
 
-exports.generatePdf = async (data) => {
+exports.generatePdf = async (data, template_name) => {
   const assetUrls = {
     logo: encodeImageToBase64("../assets/logo.png"),
     bankQr: encodeImageToBase64("../assets/bank-qr.png"),
@@ -18,7 +18,7 @@ exports.generatePdf = async (data) => {
   };
 
   const html = await ejs.renderFile(
-    path.join(__dirname, "invoiceTemplate.ejs"),
+    path.join(__dirname,"..","pdfTemplates", template_name),
     { ...data, assetUrls },
     { async: true }
   );
