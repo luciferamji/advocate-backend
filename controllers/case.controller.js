@@ -26,7 +26,7 @@ exports.getCases = async (req, res, next) => {
       whereClause[Op.or] = [
         { caseNumber: { [Op.iLike]: `%${search}%` } },
         { title: { [Op.iLike]: `%${search}%` } },
-        {filingNumber: { [Op.iLike]: `%${search}%` } },
+        { filingNumber: { [Op.iLike]: `%${search}%` } },
       ];
     }
 
@@ -34,28 +34,40 @@ exports.getCases = async (req, res, next) => {
       whereClause.advocateId = req.user.id;
     }
 
+    // Build include array
+    const include = [
+      {
+        model: Client,
+        as: 'client',
+        attributes: ['id', 'name']
+      },
+      {
+        model: Hearing,
+        as: 'hearings',
+        where: {
+          date: {
+            [Op.gte]: new Date()
+          }
+        },
+        required: false,
+        separate: true,
+        order: [['date', 'ASC']],
+        limit: 1
+      }
+    ];
+
+    // Add admin include only for super-admins
+    if (req.user.role === 'super-admin') {
+      include.push({
+        model: Admin,
+        as: 'advocate',
+        attributes: ['name']
+      });
+    }
+
     const { count, rows } = await Case.findAndCountAll({
       where: whereClause,
-      include: [
-        {
-          model: Client,
-          as: 'client',
-          attributes: ['id', 'name']
-        },
-        {
-          model: Hearing,
-          as: 'hearings',
-          where: {
-            date: {
-              [Op.gte]: new Date() // Only future or today
-            }
-          },
-          required: false,
-          separate: true,
-          order: [['date', 'ASC']],
-          limit: 1 // Get only the next hearing
-        }
-      ],
+      include,
       order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
       offset: parseInt(page) * parseInt(limit),
@@ -66,7 +78,7 @@ exports.getCases = async (req, res, next) => {
 
     const cases = rows.map(caseItem => {
       const nextHearing = caseItem.hearings?.[0]?.date || null;
-      return {
+      const result = {
         id: caseItem.id.toString(),
         caseNumber: caseItem.caseNumber,
         filingNumber: caseItem.filingNumber,
@@ -80,6 +92,13 @@ exports.getCases = async (req, res, next) => {
         createdAt: caseItem.createdAt,
         updatedAt: caseItem.updatedAt
       };
+
+      // Add advocate details only for super-admins
+      if (req.user.role === 'super-admin') {
+        result.advocateName = caseItem.advocate?.name || null;
+      }
+
+      return result;
     });
 
     res.status(200).json({
@@ -96,61 +115,83 @@ exports.getCases = async (req, res, next) => {
   }
 };
 
+
 // @desc    Get single case
 // @route   GET /api/cases/:id
 // @access  Private
 exports.getCase = async (req, res, next) => {
   try {
-    const caseItem = await Case.findByPk(req.params.id, {
-      include: [
-        {
-          model: Client,
-          as: 'client',
-          attributes: ['id', 'name']
+    const isSuperAdmin = req.user.role === 'super-admin';
+
+    // Build the include array
+    const include = [
+      {
+        model: Client,
+        as: 'client',
+        attributes: ['id', 'name']
+      },
+      {
+        model: Hearing,
+        as: 'hearings',
+        where: {
+          date: {
+            [Op.gte]: new Date()
+          }
         },
-        {
-          model: Hearing,
-          as: 'hearings',
-          where: {
-            date: {
-              [Op.gte]: new Date() // Only future or today
-            }
-          },
-          required: false,
-          separate: true,
-          order: [['date', 'ASC']],
-          limit: 1 // Get only the next hearing
-        }
-      ]
-    });
+        required: false,
+        separate: true,
+        order: [['date', 'ASC']],
+        limit: 1
+      }
+    ];
+
+    // Conditionally include the admin if user is super-admin
+    if (isSuperAdmin) {
+      include.push({
+        model: Admin,
+        as: 'advocate',
+        attributes: ['name', 'phone']
+      });
+    }
+
+    const caseItem = await Case.findByPk(req.params.id, { include });
 
     if (!caseItem) {
       return next(new ErrorResponse('Case not found', 'CASE_NOT_FOUND', { id: req.params.id }));
     }
 
-    // Check ownership if not super-admin
-    if (req.user.role !== 'super-admin' && caseItem.advocateId !== req.user.id) {
+    // Check ownership for non-super-admins
+    if (!isSuperAdmin && caseItem.advocateId !== req.user.id) {
       return next(new ErrorResponse('Not authorized to access this case', 'UNAUTHORIZED_ACCESS'));
     }
 
-    res.status(200).json({
+    const response = {
       id: caseItem.id.toString(),
       caseNumber: caseItem.caseNumber,
       filingNumber: caseItem.filingNumber,
       title: caseItem.title,
       description: caseItem.description,
-      clientId: caseItem.client.id.toString(),
-      clientName: caseItem.client.name,
+      clientId: caseItem.client?.id?.toString() || null,
+      clientName: caseItem.client?.name || null,
       courtName: caseItem.courtName,
       status: caseItem.status,
       nextHearing: caseItem.hearings?.[0]?.date || null,
       createdAt: caseItem.createdAt,
       updatedAt: caseItem.updatedAt
-    });
+    };
+
+    // Add advocate details only if super-admin
+    if (isSuperAdmin) {
+      response.advocateName = caseItem.advocate?.name || null;
+      response.advocatePhone = caseItem.advocate?.phone || null;
+    }
+
+    res.status(200).json(response);
   } catch (error) {
     next(new ErrorResponse(error.message, 'CASE_FETCH_ERROR'));
   }
 };
+
 
 // @desc    Create new case
 // @route   POST /api/cases
