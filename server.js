@@ -40,6 +40,7 @@ app.use('/api/upload', require('./routes/upload.routes'));
 app.use('/api/download', require('./routes/download.routes'));
 app.use('/api/invoices', require('./routes/invoice.routes'));
 app.use('/api/document-links', require('./routes/documentLink.routes'));
+app.use('/api/tasks', require('./routes/task.routes'));
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));

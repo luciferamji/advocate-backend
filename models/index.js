@@ -34,6 +34,8 @@ db.CaseCommentDoc = require('./caseCommentDoc.model')(sequelize, Sequelize);
 db.UploadLink = require('./uploadLink.model')(sequelize, Sequelize);
 db.DocumentLink = require('./documentLink.model')(sequelize, Sequelize);
 db.Invoice = require('./invoice.model')(sequelize, Sequelize);
+db.Task = require('./task.model')(sequelize, Sequelize);
+
 // Define associations
 
 // Admin - Advocate relationship (1:1)
@@ -216,6 +218,16 @@ db.Invoice.belongsTo(db.Client, {
 db.Client.hasMany(db.Invoice, {
   foreignKey: 'clientId',
   as: 'invoices'
+});
+
+db.Task.belongsTo(db.Admin, {
+  foreignKey: 'adminId',
+  as: 'admin',
+});
+
+db.Admin.hasMany(db.Task, {
+  foreignKey: 'adminId',
+  as: 'tasks',
 });
 
 module.exports = db;
