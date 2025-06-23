@@ -84,4 +84,8 @@ const startServer = async () => {
 
 startServer();
 
+
+//cron declaration
 require('./cron/nextDayHearingCron');
+require('./cron/linkCleanupCron');
+require('./cron/invoiceReminderCron')

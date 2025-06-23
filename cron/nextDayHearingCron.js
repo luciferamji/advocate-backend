@@ -66,7 +66,7 @@ const sendHearingReminders = async () => {
         console.error('Error sending hearing reminders:', err);
     }
 };
-// Run every day at 4:00 PM IST (10:30 AM UTC)
-cron.schedule('0 10 * * *', sendHearingReminders, {
-    timezone: 'Asia/Kolkata'
+
+cron.schedule('0 17 * * *', sendHearingReminders, {
+  timezone: 'Asia/Kolkata'
 });
