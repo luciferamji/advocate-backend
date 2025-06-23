@@ -1,4 +1,4 @@
-const { Invoice, Client, Sequelize } = require('../models');
+const { Invoice, Client, Sequelize, Admin } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { generatePdf } = require('../utils/generatePdf');
 const { numberToIndianWords } = require('../utils/numberToWords');
@@ -6,11 +6,13 @@ const { Op } = require('sequelize');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs-extra');
+const { generateInitialInvoiceEmail } = require('../emailTemplates/invoiceInitial')
+const { sendEmail } = require('../utils/email')
 
 // @desc    Create new invoice
 // @route   POST /api/invoices
 // @access  Private
-exports.generateInvoice = async (req, res) => {
+exports.generateInvoice = async (req, res, next) => {
   try {
     const {
       clientId,
@@ -57,7 +59,16 @@ exports.generateInvoice = async (req, res) => {
     const sgstN = sgst ? Number(parseFloat(sgst).toFixed(2)) : 0;
     const igstN = igst ? Number(parseFloat(igst).toFixed(2)) : 0;
     const amountInWords = `${numberToIndianWords(amount)} Only`;
+
     const client = await Client.findByPk(clientId);
+    if (!client) {
+      return next(new ErrorResponse("Client not found", "NOT_FOUND"));
+    }
+
+    const advocate = await Admin.findByPk(client.createdBy);
+    if (!advocate) {
+      return next(new ErrorResponse("Advocate not found", "NOT_FOUND"));
+    }
 
     const invoiceData = {
       invoiceId,
@@ -94,6 +105,17 @@ exports.generateInvoice = async (req, res) => {
       status: status.toUpperCase(),
       filePath: fileName,
     });
+
+    await sendEmail(generateInitialInvoiceEmail({
+      clientName: client.name,
+      clientEmail: client.email,
+      advocateName: advocate.name,
+      advocateEmail: advocate.email,
+      invoiceId,
+      dueDate: new Date(dueDate).toISOString().split("T")[0],
+      invoiceAttachmentPath: filePath
+    }));
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", "inline; filename=invoice.pdf");
     res.status(200).end(pdfBuffer);
