@@ -220,6 +220,15 @@ db.Client.hasMany(db.Invoice, {
   as: 'invoices'
 });
 
+db.Invoice.belongsTo(db.Admin, {
+  foreignKey: 'advocateId',
+  as: 'advocate'
+});
+db.Admin.hasMany(db.Invoice, {
+  foreignKey: 'advocateId',
+  as: 'invoices'
+});
+
 db.Task.belongsTo(db.Admin, {
   foreignKey: 'adminId',
   as: 'admin',
