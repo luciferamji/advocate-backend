@@ -49,7 +49,7 @@ exports.generateInvoice = async (req, res, next) => {
     });
 
     const newSerialNumber = lastInvoice?.serialNumber
-      ? lastInvoice.serialNumber + 1
+      ? Number(lastInvoice.serialNumber) + 1
       : 1000; 
 
     const invoiceId = padSerial(newSerialNumber); 
