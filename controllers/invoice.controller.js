@@ -12,6 +12,10 @@ const { sendEmail } = require('../utils/email')
 // @desc    Create new invoice
 // @route   POST /api/invoices
 // @access  Private
+const padSerial = (num, length = 16) => {
+  return `LAWFY${num.toString().padStart(length, '0')}`;
+};
+
 exports.generateInvoice = async (req, res, next) => {
   try {
     const {
@@ -27,31 +31,28 @@ exports.generateInvoice = async (req, res, next) => {
       clientGstNo,
     } = req.body;
 
-    if (
-      !clientId ||
-      !items?.length ||
-      !total ||
-      !status
-    ) {
+    if (!clientId || !items?.length || !total || !status) {
       return next(
         new ErrorResponse(
           "Please provide all required fields",
           "VALIDATION_ERROR",
           {
-            required: [
-              "clientId",
-              "items",
-              "total",
-              "courtName",
-              "clientContact",
-              "status",
-            ],
+            required: ["clientId", "items", "total", "status"],
           }
         )
       );
     }
 
-    const invoiceId = `LAWFY-${Date.now().toString()}`;
+   
+    const lastInvoice = await Invoice.findOne({
+      order: [['serialNumber', 'DESC']],
+    });
+
+    const newSerialNumber = lastInvoice?.serialNumber
+      ? lastInvoice.serialNumber + 1
+      : 1000; 
+
+    const invoiceId = padSerial(newSerialNumber); 
     const invoiceDate = new Date().toISOString().split("T")[0];
     const amount = Number(parseFloat(total).toFixed(2));
     const fileName = `${uuidv4()}.pdf`;
@@ -95,6 +96,7 @@ exports.generateInvoice = async (req, res, next) => {
     await fs.writeFile(filePath, pdfBuffer);
 
     await Invoice.create({
+      serialNumber: newSerialNumber,
       invoiceId,
       clientId,
       advocateId: client.createdBy,
@@ -123,6 +125,7 @@ exports.generateInvoice = async (req, res, next) => {
     res.status(500).json({ message: "Failed to generate PDF" });
   }
 };
+
 
 // @desc    Get invoice by ID
 // @route   GET /api/invoices/:id
