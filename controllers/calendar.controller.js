@@ -74,7 +74,7 @@ exports.getCalendarData = async (req, res, next) => {
 
       return {
         id: hearing.id.toString(),
-        title: `Case: ${hearing.case.caseNumber}`,
+        title: `${hearing.case.caseNumber}`,
         start: hearingDate.toISOString(),
         client: {
           id: hearing.case.client.id.toString(),
