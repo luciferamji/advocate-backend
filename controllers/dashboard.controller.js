@@ -112,20 +112,16 @@ exports.getRecentItems = async (req, res, next) => {
 
 exports.downloadTodayHearingsPdf = async (req, res, next) => {
   try {
-    const today = new Date().toISOString().split('T')[0];;
+    const today = new Date().toISOString().split('T')[0];
 
-    const whereClause = {
-
-    };
-
+    const whereClause = {};
     if (req.user.role !== 'super-admin') {
       whereClause['advocateId'] = req.user.id;
     }
 
+    // Step 1: Fetch today's hearings
     const hearings = await Hearing.findAll({
-      where: {
-        date: today
-      },
+      where: { date: today },
       include: [{
         model: Case,
         as: 'case',
@@ -146,22 +142,38 @@ exports.downloadTodayHearingsPdf = async (req, res, next) => {
       return res.status(404).json({ message: 'No hearings scheduled for today' });
     }
 
+    // Step 2: Build result with previousDate
     const data = {
-      hearings: hearings.map(h => ({
+      name: req.user.name || 'Advocate',
+      today: today,
+      hearings: []
+    };
+
+    for (const h of hearings) {
+      // Step 3: Find previous hearing for this case before today
+      const prevHearing = await Hearing.findOne({
+        where: {
+          caseId: h.case.id,
+          date: { [Op.lt]: today }
+        },
+        order: [['date', 'DESC'], ['time', 'DESC']],
+        attributes: ['date']
+      });
+
+      data.hearings.push({
         id: h.id.toString(),
         caseId: h.case.id.toString(),
         caseName: h.case.title,
-        clientPhone: h.case.client.phone.toString(),
+        caseNo: h.case.caseNumber || 'N/A',
         clientName: h.case.client.name,
-        date: h.date,
-        time: h.time,
-        courtName: h.courtName,
-        purpose: h.purpose,
-        judge: h.judge
-      })),
-      name: req.user.name || 'Advocate',
-      today: today,
-    };
+        clientPhone: h.case.client.phone,
+        courtName: h.courtName || 'N/A',
+        purpose: h.purpose || 'N/A',
+        time: h.time || 'N/A',
+        previousDate: prevHearing?.date || 'N/A',
+        nextDate: h.nextDate || '         '
+      });
+    }
 
     const pdfBuffer = await generatePdf(data, 'dailyHearingTemplate.ejs');
     res.setHeader("Content-Type", "application/pdf");

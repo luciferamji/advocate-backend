@@ -109,7 +109,6 @@ exports.generateInvoice = async (req, res, next) => {
     await sendEmail(generateInitialInvoiceEmail({
       clientName: client.name,
       clientEmail: client.email,
-      advocateName: advocate.name,
       advocateEmail: advocate.email,
       invoiceId,
       dueDate: new Date(dueDate).toISOString().split("T")[0],

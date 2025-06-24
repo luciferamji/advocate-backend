@@ -61,7 +61,6 @@ const sendOverdueInvoiceReminders = async () => {
                 const invoiceEmail = generateInvoiceReminderEmail({
                     clientName: client.name,
                     clientEmail: client.email,
-                    advocateName: advocate.name,
                     advocateEmail: advocate.email,
                     invoiceId: invoice.invoiceId,
                     daysOverdue,

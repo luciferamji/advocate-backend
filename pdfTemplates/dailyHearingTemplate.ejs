@@ -4,10 +4,6 @@
 <head>
     <meta charset="UTF-8" />
     <style>
-
-    </style>
-
-    <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             padding: 30px;
@@ -29,53 +25,45 @@
             margin-bottom: 10px;
         }
 
-
-        .case-block strong {
-            display: inline-block;
-            width: 130px;
-        }
-
         .footer {
             margin-top: 40px;
             font-size: 14px;
             text-align: center;
         }
 
-        .case-block {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px 20px;
-            margin: 20px 0;
-            background-color: #fafafa;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-        }
-
-        .case-header {
-            font-size: 16px;
-            font-weight: 600;
-            color: #2e5aac;
-            margin-bottom: 10px;
-        }
-
-        .case-table {
+        table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 14px;
+            margin-top: 20px;
+            font-size: 13px;
+            table-layout: fixed;
         }
 
-        .case-table td {
-            padding: 4px 8px;
+        th,
+        td {
+            padding: 10px 12px;
+            border: 1px solid #ccc;
+            text-align: left;
             vertical-align: top;
+            word-break: break-word;
+            white-space: normal;
         }
 
-        .case-table td:first-child {
-            width: 120px;
-            font-weight: 600;
-            color: #555;
+        th {
+            background-color: #f0f4f8;
+            color: #2e5aac;
         }
 
-        .case-table td:last-child {
-            color: #333;
+        tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        /* Optional: targeted max-widths */
+        .case-name,
+        .client-name,
+        .court-name,
+        .purpose {
+            max-width: 160px;
         }
     </style>
 </head>
@@ -92,62 +80,59 @@
         </strong>,</p>
     <p>Below are your scheduled hearings for Today:</p>
 
-    <% hearings.forEach((h, index)=> { %>
-        <div class="case-block">
-            <div class="case-header">
-                <span class="case-index">Hearing <%= index + 1 %></span>
-            </div>
-            <table class="case-table">
+    <table>
+        <thead>
+            <tr>
+                <th>Serial No.</th>
+                <th>Case No</th>
+                <th>Client Name</th>
+                <th>Client Phone</th>
+                <th>Court</th>
+                <th>P/D</th>
+                <th>Time</th>
+                <th>Purpose</th>
+                <th>Next Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% hearings.forEach((h, index)=> { %>
                 <tr>
-                    <td><strong>📌 Case:</strong></td>
                     <td>
-                        <%= h.caseName %>
+                        <%= index + 1 %>
                     </td>
-                </tr>
-                <tr>
-                    <td><strong>👤 Client:</strong></td>
-                    <td>
-                        <%= h.clientName %>
+                    <td class="case-name">
+                        <%= h.caseNo || 'N/A' %>
                     </td>
-                </tr>
-                                <tr>
-                    <td><strong>👤 Client Phone:</strong></td>
-                    <td>
-                        <%= h.clientPhone %>
+                    <td class="client-name">
+                        <%= h.clientName || 'N/A' %>
                     </td>
-                </tr>
-                <tr>
-                    <td><strong>🕒 Time:</strong></td>
                     <td>
-                        <%= h.time %>
+                        <%= h.clientPhone || 'N/A' %>
                     </td>
-                </tr>
-                <tr>
-                    <td><strong>🏛 Court:</strong></td>
-                    <td>
-                        <%= h.courtName %>
+                    <td class="court-name">
+                        <%= h.courtName || 'N/A' %>
                     </td>
-                </tr>
-                <tr>
-                    <td><strong>📄 Purpose:</strong></td>
                     <td>
+                        <%= h.previousDate || 'N/A' %>
+                    </td>
+                    <td>
+                        <%= h.time || 'N/A' %>
+                    </td>
+                    <td class="purpose">
                         <%= h.purpose || 'N/A' %>
                     </td>
-                </tr>
-                <tr>
-                    <td><strong>⚖️ Judge:</strong></td>
                     <td>
-                        <%= h.judge || 'N/A' %>
+                        <%= h.nextDate || 'N/A' %>
                     </td>
                 </tr>
-            </table>
-        </div>
-        <% }) %>
+                <% }) %>
+        </tbody>
+    </table>
 
-            <div class="footer">
-                Best regards,<br />
-                <strong>Lawfy & Co</strong>
-            </div>
+    <div class="footer">
+        Best regards,<br />
+        <strong>LAWFY & CO</strong>
+    </div>
 </body>
 
 </html>

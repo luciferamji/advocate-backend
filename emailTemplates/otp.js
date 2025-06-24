@@ -27,7 +27,7 @@ exports.generateDocumentUploadEmail = ({ email, caseNumber, title, description, 
           If you have any questions or require assistance, please contact your advocate.
         </p>
 
-        <p style="margin-top: 30px;">Best regards,<br /><strong>Lawfy & Co</strong></p>
+        <p style="margin-top: 30px;">Best regards,<br /><strong>LAWFY & CO</strong></p>
       </div>
     `,
     attachments: [
