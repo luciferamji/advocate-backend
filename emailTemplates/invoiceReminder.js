@@ -1,7 +1,6 @@
 exports.generateInvoiceReminderEmail = ({
   clientName,
   clientEmail,
-  advocateName,
   advocateEmail,
   invoiceId,
   daysOverdue,
@@ -28,7 +27,7 @@ exports.generateInvoiceReminderEmail = ({
 
         <p>If you have already made the payment, kindly ignore this message.</p>
 
-        <p style="margin-top: 20px;">Best regards,<br /><strong>${advocateName}</strong><br />Lawfy & Co</p>
+        <p style="margin-top: 20px;">Best regards,<br /><strong>Finance Team</strong><br />LAWFY & CO</p>
       </div>
     `,
     attachments: [

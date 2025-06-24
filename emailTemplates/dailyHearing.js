@@ -24,14 +24,14 @@ exports.generateHearingEmail = ({ name, email, tomorrow, hearings }) => {
           </div>
         `).join('')}
 
-        <p style="margin-top: 20px;">Best regards,<br /><strong>Lawfy & Co</strong></p>
+        <p style="margin-top: 20px;">Best regards,<br /><strong>LAWFY & CO</strong></p>
       </div>
     `,
     attachments: [
       {
         filename: 'logo.png',
-        path: './assets/logo.png', // Adjust path as per your setup
-        cid: 'logo' // same as in the <img src="cid:logo" />
+        path: './assets/logo.png', 
+        cid: 'logo' 
       }
     ]
   };

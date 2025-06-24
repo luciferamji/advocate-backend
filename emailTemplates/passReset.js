@@ -23,14 +23,14 @@ exports.passReset = (name, email, password) => {
 
   <p style="font-size: 15px; color: #444;">If you have any questions or need assistance, feel free to contact the system administrator.</p>
 
-  <p style="margin-top: 30px; font-size: 15px; color: #444;">Best regards,<br><strong>Admin Team</strong><br>Lawfy & Co</p>
+  <p style="margin-top: 30px; font-size: 15px; color: #444;">Best regards,<br><strong>Admin Team</strong><br>LAWFY & CO</p>
 </div>
     `,
         attachments: [
             {
                 filename: 'logo.png',
-                path: './assets/logo.png', // Adjust path as per your setup
-                cid: 'logo' // same as in the <img src="cid:logo" />
+                path: './assets/logo.png', 
+                cid: 'logo' 
             }
         ]
     });

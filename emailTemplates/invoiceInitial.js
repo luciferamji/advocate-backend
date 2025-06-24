@@ -1,7 +1,6 @@
 exports.generateInitialInvoiceEmail = ({
   clientName,
   clientEmail,
-  advocateName,
   advocateEmail,
   invoiceId,
   dueDate,
@@ -29,7 +28,7 @@ exports.generateInitialInvoiceEmail = ({
 
         <p style="margin-top: 20px;">Thank you for your trust in our services.</p>
 
-        <p style="margin-top: 20px;">Best regards,<br /><strong>${advocateName}</strong><br />Lawfy & Co</p>
+        <p style="margin-top: 20px;">Best regards,<br /><strong>Finance Team</strong><br />LAWFY & CO</p>
       </div>
     `,
     attachments: [
