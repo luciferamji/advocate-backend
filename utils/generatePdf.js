@@ -30,7 +30,7 @@ exports.generatePdf = async (data, template_name) => {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let browser = null;
     try {
-      logger.info(`Starting Chrome (attempt ${attempt}/${maxAttempts})...`);
+      console.log(`Starting Chrome (attempt ${attempt}/${maxAttempts})...`);
 
       browser = await puppeteer.launch({
         headless: "new",
@@ -52,7 +52,7 @@ exports.generatePdf = async (data, template_name) => {
       });
 
       await sleep(1000);
-      logger.info("Chrome started...");
+      console.log("Chrome started...");
 
       const page = await browser.newPage();
       await page.setContent(html, { waitUntil: "networkidle0" });
@@ -64,13 +64,13 @@ exports.generatePdf = async (data, template_name) => {
         scale: 0.7,
       });
 
-      return pdfBuffer; 
+      return pdfBuffer;
 
     } catch (error) {
-      logger.error(`Attempt ${attempt} failed:`, error);
+      console.error(`Attempt ${attempt} failed:`, error);
 
       if (attempt < maxAttempts) {
-        logger.info("Retrying in 1s...");
+        console.info("Retrying in 1s...");
         await sleep(1000);
       } else {
         throw new Error("Failed to generate PDF after multiple attempts.");
@@ -80,9 +80,9 @@ exports.generatePdf = async (data, template_name) => {
       if (browser) {
         try {
           await browser.close();
-          logger.info("Browser closed.");
+          console.info("Browser closed.");
         } catch (closeErr) {
-          logger.warn("Error closing browser:", closeErr);
+          console.warn("Error closing browser:", closeErr);
         }
       }
     }
