@@ -1,4 +1,4 @@
-const { Client, Case, Admin, sequelize, Invoice} = require('../models');
+const { Client, Case, Admin, sequelize, Invoice } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 
@@ -86,13 +86,18 @@ exports.getClients = async (req, res, next) => {
 
     const { count, rows } = await Client.findAndCountAll({
       where: whereClause,
-      include: [
-        {
-          model: Case,
-          as: 'cases',
-          required: false
-        }
-      ],
+      attributes: {
+        include: [
+          [
+            sequelize.literal(`(
+              SELECT COUNT(*)
+              FROM "case" AS c
+              WHERE c."clientId" = "client"."id"
+            )`),
+            'caseCount'
+          ]
+        ]
+      },
       order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
       offset: parseInt(page) * parseInt(limit),
@@ -108,7 +113,7 @@ exports.getClients = async (req, res, next) => {
       email: client.email || '',
       phone: client.phone || '',
       address: client.address || '',
-      caseCount: client.cases?.length || 0,
+      caseCount: parseInt(client.get('caseCount')) || 0,
       createdAt: client.createdAt
     }));
 
@@ -256,15 +261,7 @@ exports.updateClient = async (req, res, next) => {
 // @access  Private
 exports.deleteClient = async (req, res, next) => {
   try {
-    const client = await Client.findByPk(req.params.id, {
-      include: [
-        {
-          model: Case,
-          as: 'cases',
-          required: false
-        }
-      ]
-    });
+    const client = await Client.findByPk(req.params.id);
 
     if (!client) {
       return next(new ErrorResponse('Client not found', 'CLIENT_NOT_FOUND', { id: req.params.id }));
@@ -275,13 +272,26 @@ exports.deleteClient = async (req, res, next) => {
       return next(new ErrorResponse('Not authorized to delete this client', 'UNAUTHORIZED_ACCESS'));
     }
 
+    const caseCount = await Case.count({ where: { clientId: client.id } });
+
     // Check if client has cases
-    if (client.cases?.length > 0) {
+    if (caseCount > 0) {
       return next(new ErrorResponse(
-        'Cannot delete client with associated cases',
+        'Cannot delete client with associated cases, case count : ' + caseCount,
         'CLIENT_HAS_CASES',
-        { caseCount: client.cases.length }
+        { caseCount }
       ));
+    }
+
+    const invoiceCount = await Invoice.count({ where: { clientId: client.id } });
+    if (invoiceCount > 0) {
+      return next(
+        new ErrorResponse(
+          'Cannot delete client with associated invoices, invoice count : ' + invoiceCount,
+          'CLIENT_HAS_INVOICES',
+          { invoiceCount }
+        )
+      );
     }
 
     await client.destroy();
