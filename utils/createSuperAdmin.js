@@ -19,7 +19,7 @@ const createSuperAdmin = async () => {
         password: hashedPassword,
         role: 'super-admin'
       });
-            await Admin.create({
+      await Admin.create({
         name: 'Super Admin',
         email: 'akshatjaitly@gmail.com',
         password: hashedPassword,
