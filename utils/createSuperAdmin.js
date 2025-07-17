@@ -14,13 +14,13 @@ const createSuperAdmin = async () => {
       const hashedPassword = await bcrypt.hash('admin123', salt);
 
       await Admin.create({
-        name: 'Super Admin',
+        name: 'AbhiJeet Chakraborty',
         email: 'abhijeet.chakraborty01@gmail.com',
         password: hashedPassword,
         role: 'super-admin'
       });
       await Admin.create({
-        name: 'Super Admin',
+        name: 'Akshat Jaitly',
         email: 'akshatjaitly@gmail.com',
         password: hashedPassword,
         role: 'super-admin'
