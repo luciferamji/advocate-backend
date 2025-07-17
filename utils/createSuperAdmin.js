@@ -15,14 +15,19 @@ const createSuperAdmin = async () => {
 
       await Admin.create({
         name: 'Super Admin',
-        email: 'admin@example.com',
+        email: 'abhijeet.chakraborty01@gmail.com',
+        password: hashedPassword,
+        role: 'super-admin'
+      });
+            await Admin.create({
+        name: 'Super Admin',
+        email: 'akshatjaitly@gmail.com',
         password: hashedPassword,
         role: 'super-admin'
       });
 
       console.log('Super admin created successfully');
-      console.log('Email: admin@example.com');
-      console.log('Password: admin123');
+
     }
   } catch (error) {
     console.error('Error creating super admin:', error);
