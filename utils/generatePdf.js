@@ -1,3 +1,15 @@
+const puppeteer = require("puppeteer");
+const ejs = require("ejs");
+const fs = require("fs");
+const path = require("path");
+
+const encodeImageToBase64 = (relativePath) => {
+  const filePath = path.resolve(__dirname, relativePath);
+  const ext = path.extname(filePath).slice(1);
+  const base64 = fs.readFileSync(filePath).toString("base64");
+  return `data:image/${ext};base64,${base64}`;
+};
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 exports.generatePdf = async (data, template_name) => {
