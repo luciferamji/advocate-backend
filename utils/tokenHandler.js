@@ -31,7 +31,7 @@ const sendTokenResponse = async (user, statusCode, res) => {
 
   // Cookie options
   const options = {
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000 * 5), // 5 days
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict'
