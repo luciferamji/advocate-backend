@@ -54,6 +54,18 @@ exports.getRecentItems = async (req, res, next) => {
           model: Client,
           as: 'client',
           attributes: ['id', 'name']
+        }, {
+          model: Hearing,
+          as: 'hearings',
+          where: {
+            date: {
+              [Op.gte]: new Date()
+            }
+          },
+          required: false,
+          separate: true,
+          order: [['date', 'ASC']],
+          limit: 1
         }],
         order: [['createdAt', 'DESC']],
         limit: 5
@@ -86,7 +98,8 @@ exports.getRecentItems = async (req, res, next) => {
       clientId: caseItem.client.id.toString(),
       clientName: caseItem.client.name,
       status: caseItem.status,
-      createdAt: caseItem.createdAt
+      createdAt: caseItem.createdAt,
+      nextHearingDate: caseItem.hearings.length > 0 ? caseItem.hearings[0].date : null
     }));
 
     const formattedHearings = upcomingHearings.map(hearing => ({
