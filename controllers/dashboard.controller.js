@@ -99,7 +99,8 @@ exports.getRecentItems = async (req, res, next) => {
       clientName: caseItem.client.name,
       status: caseItem.status,
       createdAt: caseItem.createdAt,
-      nextHearingDate: caseItem.hearings.length > 0 ? caseItem.hearings[0].date : null
+      nextHearingDate: caseItem.hearings.length > 0 ? caseItem.hearings[0].date : null,
+      courtName: caseItem.courtName || 'N/A'
     }));
 
     const formattedHearings = upcomingHearings.map(hearing => ({
