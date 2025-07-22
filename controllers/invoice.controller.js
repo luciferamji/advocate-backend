@@ -12,7 +12,7 @@ const { sendEmail } = require('../utils/email')
 // @desc    Create new invoice
 // @route   POST /api/invoices
 // @access  Private
-const padSerial = (num, length = 16) => {
+const padSerial = (num, length = 11) => {
   return `LAWFY${num.toString().padStart(length, '0')}`;
 };
 
