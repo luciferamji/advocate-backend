@@ -130,7 +130,76 @@ exports.getClients = async (req, res, next) => {
     next(new ErrorResponse(error.message, 'CLIENT_LIST_ERROR'));
   }
 };
+exports.getClientsTemp = async (req, res, next) => {
+  try {
+    const {
+      page = 0,
+      limit = 10,
+      search = '',
+      advocateId = '',
+    } = req.query;
 
+    const whereClause = {};
+
+    if (advocateId) {
+      whereClause.createdBy = advocateId;
+    }
+
+    // Add search condition
+    if (search) {
+      whereClause[Op.or] = [
+        { name: { [Op.iLike]: `%${search}%` } },
+        { email: { [Op.iLike]: `%${search}%` } },
+        { clientId: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    const { count, rows } = await Client.findAndCountAll({
+      where: whereClause,
+      attributes: {
+        include: [
+          [
+            sequelize.literal(`(
+              SELECT COUNT(*)
+              FROM "case" AS c
+              WHERE c."clientId" = "client"."id"
+            )`),
+            'caseCount'
+          ]
+        ]
+      },
+      order: [['createdAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(page) * parseInt(limit),
+      distinct: true
+    });
+
+    const totalPages = Math.ceil(count / parseInt(limit));
+
+    const clients = rows.map(client => ({
+      id: client.id.toString(),
+      name: client.name,
+      clientId: client.clientId,
+      email: client.email || '',
+      phone: client.phone || '',
+      address: client.address || '',
+      caseCount: parseInt(client.get('caseCount')) || 0,
+      createdAt: client.createdAt
+    }));
+
+    res.status(200).json({
+      clients,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages
+      }
+    });
+  } catch (error) {
+    next(new ErrorResponse(error.message, 'CLIENT_LIST_ERROR'));
+  }
+};
 // @desc    Get single client
 // @route   GET /api/clients/:id
 // @access  Private
