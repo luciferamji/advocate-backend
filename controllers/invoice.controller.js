@@ -1,4 +1,4 @@
-const { Invoice, Client, Sequelize, Admin } = require('../models');
+const { Invoice, Client, Sequelize, Admin, sequelize } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { generatePdf } = require('../utils/generatePdf');
 const { numberToIndianWords } = require('../utils/numberToWords');
@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs-extra');
 const { generateInitialInvoiceEmail } = require('../emailTemplates/invoiceInitial')
+const { generateInvoiceStatusUpdateEmail } = require('../emailTemplates/invoiceStatusupdate');
 const { sendEmail } = require('../utils/email')
 
 // @desc    Create new invoice
@@ -43,16 +44,16 @@ exports.generateInvoice = async (req, res, next) => {
       );
     }
 
-   
+
     const lastInvoice = await Invoice.findOne({
       order: [['serialNumber', 'DESC']],
     });
 
     const newSerialNumber = lastInvoice?.serialNumber
       ? Number(lastInvoice.serialNumber) + 1
-      : 1000; 
+      : 1000;
 
-    const invoiceId = padSerial(newSerialNumber); 
+    const invoiceId = padSerial(newSerialNumber);
     const invoiceDate = new Date().toISOString().split("T")[0];
     const amount = Number(parseFloat(total).toFixed(2));
     const fileName = `${uuidv4()}.pdf`;
@@ -108,7 +109,7 @@ exports.generateInvoice = async (req, res, next) => {
       filePath: fileName,
     });
 
-    await sendEmail(generateInitialInvoiceEmail({
+    sendEmail(generateInitialInvoiceEmail({
       clientName: client.name,
       clientEmail: client.email,
       advocateEmail: advocate.email,
@@ -203,26 +204,101 @@ exports.getInvoices = async (req, res) => {
 // @route   PUT /api/invoices/:id
 // @access  Private
 exports.updateInvoice = async (req, res, next) => {
+  const t = await sequelize.transaction(); // start transaction
   try {
-    const invoice = await Invoice.findByPk(req.params.id);
+    let invoice = await Invoice.findByPk(req.params.id, {
+      include: [
+        { model: Client, as: 'client', attributes: ['name', 'email'] },
+        { model: Admin, as: 'advocate', attributes: ['email'] }
+      ]
+    });
+
+    if (!invoice) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Invoice not found' });
+    }
+
     if (
       req.user.role !== 'super-admin' &&
-      invoice?.advocateId !== req.user.id
+      invoice.advocateId !== req.user.id
     ) {
+      await t.rollback();
       return next(new ErrorResponse('Not authorized to update this invoice', 'UNAUTHORIZED_ACCESS'));
     }
 
-    const [updated] = await Invoice.update(req.body, {
-      where: { id: req.params.id }
-    });
-    if (!updated) {
-      return res.status(404).json({ message: "Invoice not found" });
+    const {
+      status,
+      comments,
+      paymentMode,
+      transactionId
+    } = req.body;
+
+    const currentStatus = invoice.status;
+
+    const statusChanged =
+      status &&
+      status !== currentStatus &&
+      ['PAID', 'CANCELLED'].includes(status) &&
+      currentStatus === 'UNPAID';
+
+    if (status && status !== currentStatus) {
+      if (currentStatus !== 'UNPAID') {
+        await t.rollback();
+        return res.status(400).json({
+          message: `Cannot change status from ${currentStatus} to ${status}. Only UNPAID invoices can be marked as PAID or CANCELLED.`
+        });
+      }
+      if (!['PAID', 'CANCELLED'].includes(status)) {
+        await t.rollback();
+        return res.status(400).json({
+          message: `Invalid status update. Allowed transitions: UNPAID -> PAID or CANCELLED.`
+        });
+      }
     }
-    const updatedInvoice = await Invoice.findByPk(req.params.id);
-    res.status(200).json(updatedInvoice);
+
+    await Invoice.update(
+      {
+        comments: comments ?? invoice.comments,
+        paymentMode: paymentMode ?? invoice.paymentMode,
+        transactionId: transactionId ?? invoice.transactionId,
+        status: status ?? invoice.status
+      },
+      {
+        where: { id: req.params.id },
+        transaction: t
+      }
+    );
+
+    // Refetch updated invoice within transaction
+    invoice = await Invoice.findByPk(req.params.id, {
+      include: [
+        { model: Client, as: 'client', attributes: ['name', 'email'] },
+        { model: Admin, as: 'advocate', attributes: ['email'] }
+      ],
+      transaction: t
+    });
+
+    // Commit transaction before sending email (optional: or keep in txn if needed)
+    await t.commit();
+
+    // Send email only if status changed
+    if (statusChanged) {
+      sendEmail(
+        generateInvoiceStatusUpdateEmail({
+          clientName: invoice.client.name,
+          clientEmail: invoice.client.email,
+          advocateEmail: invoice.advocate.email,
+          invoiceId: invoice.invoiceId,
+          status: invoice.status
+        })
+      );
+    }
+
+    res.status(200).json(invoice);
   } catch (error) {
-    console.error("Update invoice error:", error);
-    res.status(500).json({ message: "Failed to update invoice" });
+    console.error('Update invoice error:', error);
+    await t.rollback();
+    res.status(500).json({ message: 'Failed to update invoice' });
   }
 };
 
