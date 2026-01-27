@@ -55,7 +55,17 @@ module.exports = (sequelize, DataTypes) => {
         filePath: {
             type: DataTypes.STRING,
             allowNull: false
+        },
+        lastReminderSentAt: {
+            type: DataTypes.DATE,
+            allowNull: true
+        },
+        reminderCount: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 0
         }
+
     }, {
         timestamps: true,
         tableName: 'invoice'
