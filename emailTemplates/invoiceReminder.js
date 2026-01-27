@@ -1,7 +1,7 @@
 exports.generateInvoiceReminderEmail = ({
   clientName,
   clientEmail,
-  advocateEmail,
+  _advocateEmail,
   invoiceId,
   daysOverdue,
   dueDate,
@@ -9,7 +9,7 @@ exports.generateInvoiceReminderEmail = ({
 }) => {
   return {
     email: clientEmail,
-    cc: [advocateEmail],
+    cc: [],
     subject: `🧾 Invoice Overdue Reminder - ${invoiceId}`,
     html: `
       <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; border: 1px solid #ddd;">
