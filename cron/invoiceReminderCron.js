@@ -11,6 +11,10 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const sendOverdueInvoiceReminders = async () => {
     try {
         const today = new Date();
+        const sevenDaysAgo = new Date(
+            today.getTime() - 7 * 24 * 60 * 60 * 1000
+        );
+
         const limit = 50;
         let offset = 0;
         let hasMore = true;
@@ -19,9 +23,11 @@ const sendOverdueInvoiceReminders = async () => {
             const invoices = await Invoice.findAll({
                 where: {
                     status: 'UNPAID',
-                    dueDate: {
-                        [Op.lt]: today
-                    }
+                    dueDate: { [Op.lt]: today },
+                    [Op.or]: [
+                        { lastReminderSentAt: null },
+                        { lastReminderSentAt: { [Op.lte]: sevenDaysAgo } }
+                    ]
                 },
                 include: [
                     {
@@ -36,7 +42,8 @@ const sendOverdueInvoiceReminders = async () => {
                     }
                 ],
                 limit,
-                offset
+                offset,
+                order: [['dueDate', 'ASC']]
             });
 
             offset += limit;
@@ -70,7 +77,14 @@ const sendOverdueInvoiceReminders = async () => {
 
                 try {
                     await sendEmail(invoiceEmail);
-                    console.log(`Sent invoice email to ${client.email}`);
+                    await invoice.update({
+                        lastReminderSentAt: new Date(),
+                        reminderCount: invoice.reminderCount + 1
+                    });
+
+                    console.log(
+                        `Invoice ${invoice.invoiceId}: reminder #${invoice.reminderCount + 1} sent to ${client.email}`
+                    );
                 } catch (err) {
                     console.error(`Failed to send email to ${client.email}:`, err.message);
                 }
@@ -84,7 +98,8 @@ const sendOverdueInvoiceReminders = async () => {
         console.error('Error during invoice email cron:', error);
     }
 };
-// Run daily at 11:15 PM IST = 17:45 UTC
+
+// Run daily at 12:30 AM IST
 cron.schedule('30 0 * * *', sendOverdueInvoiceReminders, {
   timezone: 'Asia/Kolkata'
 });
