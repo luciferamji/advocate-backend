@@ -34,6 +34,7 @@ db.CaseCommentDoc = require('./caseCommentDoc.model')(sequelize, Sequelize);
 db.UploadLink = require('./uploadLink.model')(sequelize, Sequelize);
 db.DocumentLink = require('./documentLink.model')(sequelize, Sequelize);
 db.Invoice = require('./invoice.model')(sequelize, Sequelize);
+db.InvoicePayment = require('./invoicePayment.model')(sequelize, Sequelize);
 db.Task = require('./task.model')(sequelize, Sequelize);
 
 // Define associations
@@ -227,6 +228,26 @@ db.Invoice.belongsTo(db.Admin, {
 db.Admin.hasMany(db.Invoice, {
   foreignKey: 'advocateId',
   as: 'invoices'
+});
+
+// Invoice - InvoicePayment relationship (1:Many)
+db.Invoice.hasMany(db.InvoicePayment, {
+  foreignKey: 'invoiceId',
+  as: 'payments'
+});
+db.InvoicePayment.belongsTo(db.Invoice, {
+  foreignKey: 'invoiceId',
+  as: 'invoice'
+});
+
+// Admin - InvoicePayment relationship (1:Many)
+db.Admin.hasMany(db.InvoicePayment, {
+  foreignKey: 'createdBy',
+  as: 'invoicePayments'
+});
+db.InvoicePayment.belongsTo(db.Admin, {
+  foreignKey: 'createdBy',
+  as: 'creator'
 });
 
 db.Task.belongsTo(db.Admin, {

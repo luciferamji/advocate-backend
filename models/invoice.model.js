@@ -39,8 +39,12 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.TEXT,
             allowNull: true
         },
+        cancellationReason: {
+            type: DataTypes.TEXT,
+            allowNull: true
+        },
         status: {
-            type: DataTypes.ENUM('UNPAID', 'PAID', 'CANCELLED'),
+            type: DataTypes.ENUM('UNPAID', 'PARTIALLY_PAID', 'PAID', 'CANCELLED'),
             allowNull: false,
             defaultValue: 'UNPAID'
         },
@@ -59,6 +63,11 @@ module.exports = (sequelize, DataTypes) => {
         amount: {
             type: DataTypes.DECIMAL(10, 2),
             allowNull: true
+        },
+        paidAmount: {
+            type: DataTypes.DECIMAL(10, 2),
+            allowNull: false,
+            defaultValue: 0
         },
         lastReminderSentAt: {
             type: DataTypes.DATE,

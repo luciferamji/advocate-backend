@@ -108,6 +108,7 @@ exports.generateInvoice = async (req, res, next) => {
       status: status.toUpperCase(),
       filePath: fileName,
       amount: amount,
+      paidAmount: 0,
     });
 
     sendEmail(generateInitialInvoiceEmail({
@@ -231,44 +232,144 @@ exports.updateInvoice = async (req, res, next) => {
       status,
       comments,
       paymentMode,
-      transactionId
+      transactionId,
+      cancellationReason
     } = req.body;
 
     const currentStatus = invoice.status;
+    const currentPaid = parseFloat(invoice.paidAmount || 0);
+    const totalAmount = parseFloat(invoice.amount || 0);
 
-    const statusChanged =
-      status &&
-      status !== currentStatus &&
-      ['PAID', 'CANCELLED'].includes(status) &&
-      currentStatus === 'UNPAID';
-
+    // Status change validation
     if (status && status !== currentStatus) {
-      if (currentStatus !== 'UNPAID') {
+      // PAID invoices cannot be changed
+      if (currentStatus === 'PAID') {
         await t.rollback();
         return res.status(400).json({
-          message: `Cannot change status from ${currentStatus} to ${status}. Only UNPAID invoices can be marked as PAID or CANCELLED.`
+          message: 'Cannot change status of fully paid invoice. Contact super admin to modify payments.'
         });
       }
-      if (!['PAID', 'CANCELLED'].includes(status)) {
+
+      // CANCELLED invoices cannot be changed
+      if (currentStatus === 'CANCELLED') {
         await t.rollback();
         return res.status(400).json({
-          message: `Invalid status update. Allowed transitions: UNPAID -> PAID or CANCELLED.`
+          message: 'Cannot change status of cancelled invoice.'
         });
+      }
+
+      // Validate status transitions
+      if (status === 'PAID') {
+        // Can mark as PAID from UNPAID or PARTIALLY_PAID
+        if (!['UNPAID', 'PARTIALLY_PAID'].includes(currentStatus)) {
+          await t.rollback();
+          return res.status(400).json({
+            message: `Cannot mark invoice as PAID from ${currentStatus} status.`
+          });
+        }
+        
+        // If marking as PAID, must provide payment details
+        if (!paymentMode) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Payment mode is required when marking invoice as PAID.'
+          });
+        }
+      }
+
+      // Validate CANCELLED transition
+      if (status === 'CANCELLED') {
+        // Can cancel from UNPAID or PARTIALLY_PAID
+        if (!['UNPAID', 'PARTIALLY_PAID'].includes(currentStatus)) {
+          await t.rollback();
+          return res.status(400).json({
+            message: `Cannot cancel invoice from ${currentStatus} status.`
+          });
+        }
+
+        // Require cancellation reason
+        if (!cancellationReason && !comments) {
+          await t.rollback();
+          return res.status(400).json({
+            message: 'Cancellation reason is required when cancelling invoice.'
+          });
+        }
       }
     }
 
-    await Invoice.update(
-      {
-        comments: comments ?? invoice.comments,
-        paymentMode: paymentMode ?? invoice.paymentMode,
-        transactionId: transactionId ?? invoice.transactionId,
-        status: status ?? invoice.status
-      },
-      {
-        where: { id: req.params.id },
-        transaction: t
+    const statusChanged = status && status !== currentStatus;
+
+    // If marking as PAID, create payment record for remaining amount
+    if (status === 'PAID' && currentStatus !== 'PAID') {
+      const remainingAmount = totalAmount - currentPaid;
+      
+      if (remainingAmount > 0) {
+        const { InvoicePayment } = require('../models');
+        await InvoicePayment.create({
+          invoiceId: req.params.id,
+          amount: remainingAmount,
+          paymentMode,
+          transactionId: transactionId || null,
+          comments: comments || 'Final payment - marked as paid',
+          paymentDate: new Date(),
+          createdBy: req.user.id
+        }, { transaction: t });
+
+        // Update invoice - keep existing comments, don't overwrite
+        await Invoice.update(
+          {
+            paidAmount: totalAmount,
+            status: 'PAID'
+          },
+          {
+            where: { id: req.params.id },
+            transaction: t
+          }
+        );
+      } else {
+        // Already fully paid, just update status
+        await Invoice.update(
+          {
+            status: 'PAID'
+          },
+          {
+            where: { id: req.params.id },
+            transaction: t
+          }
+        );
       }
-    );
+    } else if (status === 'CANCELLED') {
+      // Update to cancelled with reason
+      // Store cancellation reason in dedicated field
+      // Keep original invoice comments intact
+      await Invoice.update(
+        {
+          status: 'CANCELLED',
+          cancellationReason: cancellationReason || comments
+        },
+        {
+          where: { id: req.params.id },
+          transaction: t
+        }
+      );
+    } else {
+      // Regular update (just updating comments, no status change)
+      const updateData = {};
+      
+      if (comments !== undefined) {
+        updateData.comments = comments;
+      }
+      
+      if (Object.keys(updateData).length > 0) {
+        await Invoice.update(
+          updateData,
+          {
+            where: { id: req.params.id },
+            transaction: t
+          }
+        );
+      }
+    }
 
     // Refetch updated invoice within transaction
     invoice = await Invoice.findByPk(req.params.id, {
