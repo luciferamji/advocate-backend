@@ -94,6 +94,32 @@ exports.addPayment = async (req, res, next) => {
       ]
     });
 
+    // Fetch invoice with client and advocate details for email
+    const invoiceWithDetails = await Invoice.findByPk(invoiceId, {
+      include: [
+        { model: Client, as: 'client', attributes: ['name', 'email'] },
+        { model: Admin, as: 'advocate', attributes: ['email'] }
+      ]
+    });
+
+    // Send payment received email
+    const { sendEmail } = require('../utils/email');
+    const { generatePaymentReceivedEmail } = require('../emailTemplates/paymentReceived');
+    
+    sendEmail(generatePaymentReceivedEmail({
+      clientName: invoiceWithDetails.client.name,
+      clientEmail: invoiceWithDetails.client.email,
+      advocateEmail: invoiceWithDetails.advocate.email,
+      invoiceId: invoiceWithDetails.invoiceId,
+      paymentAmount: paymentAmount,
+      totalAmount: totalAmount,
+      paidAmount: newPaidAmount,
+      remainingAmount: totalAmount - newPaidAmount,
+      paymentMode: paymentMode,
+      transactionId: transactionId || null,
+      status: newStatus
+    }));
+
     res.status(201).json({
       payment: paymentWithDetails,
       invoice: {
