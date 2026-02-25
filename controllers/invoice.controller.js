@@ -107,6 +107,7 @@ exports.generateInvoice = async (req, res, next) => {
       comments: comments || null,
       status: status.toUpperCase(),
       filePath: fileName,
+      amount: amount,
     });
 
     sendEmail(generateInitialInvoiceEmail({

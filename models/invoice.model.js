@@ -56,6 +56,10 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: false
         },
+        amount: {
+            type: DataTypes.DECIMAL(10, 2),
+            allowNull: true
+        },
         lastReminderSentAt: {
             type: DataTypes.DATE,
             allowNull: true
