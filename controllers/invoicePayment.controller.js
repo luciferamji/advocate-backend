@@ -1,4 +1,4 @@
-const { InvoicePayment, Invoice, Admin, sequelize } = require('../models');
+const { InvoicePayment, Invoice, Admin, Client, sequelize } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 
