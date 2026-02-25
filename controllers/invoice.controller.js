@@ -406,20 +406,40 @@ exports.updateInvoice = async (req, res, next) => {
 
 // @desc    Delete invoice by ID
 // @route   DELETE /api/invoices/:id
-// @access  Private
-exports.deleteInvoice = async (req, res) => {
+// @access  Private (Super Admin only)
+exports.deleteInvoice = async (req, res, next) => {
+  const t = await sequelize.transaction();
+  
   try {
     if (req.user.role !== 'super-admin') {
+      await t.rollback();
       return next(new ErrorResponse('Not authorized to delete this invoice', 'UNAUTHORIZED_ACCESS'));
     }
-    const deleted = await Invoice.destroy({
-      where: { id: req.params.id }
-    });
-    if (!deleted) {
+
+    const invoice = await Invoice.findByPk(req.params.id, { transaction: t });
+    
+    if (!invoice) {
+      await t.rollback();
       return res.status(404).json({ message: "Invoice not found" });
     }
-    res.status(200).json({ message: "Invoice deleted successfully" });
+
+    // Delete all associated payments first
+    const { InvoicePayment } = require('../models');
+    await InvoicePayment.destroy({
+      where: { invoiceId: req.params.id },
+      transaction: t
+    });
+
+    // Then delete the invoice
+    await Invoice.destroy({
+      where: { id: req.params.id },
+      transaction: t
+    });
+
+    await t.commit();
+    res.status(200).json({ message: "Invoice and associated payments deleted successfully" });
   } catch (error) {
+    await t.rollback();
     console.error("Delete invoice error:", error);
     res.status(500).json({ message: "Failed to delete invoice" });
   }
