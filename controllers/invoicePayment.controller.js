@@ -42,12 +42,13 @@ exports.addPayment = async (req, res, next) => {
     const paymentAmount = parseFloat(amount);
     const currentPaid = parseFloat(invoice.paidAmount || 0);
     const totalAmount = parseFloat(invoice.amount || 0);
-    const remaining = totalAmount - currentPaid;
+    const remaining = Math.round((totalAmount - currentPaid) * 100) / 100;
 
-    if (paymentAmount > remaining) {
+    // Allow small floating point tolerance (0.01)
+    if (paymentAmount > remaining + 0.01) {
       await t.rollback();
       return res.status(400).json({ 
-        message: `Payment amount (₹${paymentAmount}) exceeds remaining amount (₹${remaining.toFixed(2)})` 
+        message: `Payment amount (₹${paymentAmount.toFixed(2)}) exceeds remaining amount (₹${remaining.toFixed(2)})` 
       });
     }
 
@@ -63,10 +64,11 @@ exports.addPayment = async (req, res, next) => {
     }, { transaction: t });
 
     // Update invoice paid amount and status
-    const newPaidAmount = currentPaid + paymentAmount;
+    const newPaidAmount = Math.round((currentPaid + paymentAmount) * 100) / 100;
     let newStatus = invoice.status;
     
-    if (newPaidAmount >= totalAmount) {
+    // Use tolerance for floating point comparison
+    if (newPaidAmount >= totalAmount - 0.01) {
       newStatus = 'PAID';
     } else if (newPaidAmount > 0) {
       newStatus = 'PARTIALLY_PAID';
