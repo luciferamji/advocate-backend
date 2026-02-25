@@ -10,6 +10,10 @@ const { protect } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
+// Nested payment routes
+const paymentRouter = require('./invoicePayment.routes');
+router.use('/:invoiceId/payments', paymentRouter);
+
 // Protected routes
 router.route('/generate')
   .post(protect, generateInvoice);
