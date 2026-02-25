@@ -85,20 +85,21 @@ exports.addPayment = async (req, res, next) => {
       }
     );
 
-    await t.commit();
-
-    // Fetch payment with creator details
-    const paymentWithDetails = await InvoicePayment.findByPk(payment.id, {
-      include: [
-        { model: Admin, as: 'creator', attributes: ['id', 'name', 'email'] }
-      ]
-    });
-
-    // Fetch invoice with client and advocate details for email
+    // Fetch invoice with client and advocate details for email (before commit)
     const invoiceWithDetails = await Invoice.findByPk(invoiceId, {
       include: [
         { model: Client, as: 'client', attributes: ['name', 'email'] },
         { model: Admin, as: 'advocate', attributes: ['email'] }
+      ],
+      transaction: t
+    });
+
+    await t.commit();
+
+    // Fetch payment with creator details (after commit, no transaction needed)
+    const paymentWithDetails = await InvoicePayment.findByPk(payment.id, {
+      include: [
+        { model: Admin, as: 'creator', attributes: ['id', 'name', 'email'] }
       ]
     });
 
