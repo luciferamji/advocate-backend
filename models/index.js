@@ -36,6 +36,7 @@ db.DocumentLink = require('./documentLink.model')(sequelize, Sequelize);
 db.Invoice = require('./invoice.model')(sequelize, Sequelize);
 db.InvoicePayment = require('./invoicePayment.model')(sequelize, Sequelize);
 db.Task = require('./task.model')(sequelize, Sequelize);
+db.PhoneNumber = require('./phoneNumber.model')(sequelize, Sequelize);
 
 // Define associations
 
@@ -258,6 +259,16 @@ db.Task.belongsTo(db.Admin, {
 db.Admin.hasMany(db.Task, {
   foreignKey: 'adminId',
   as: 'tasks',
+});
+
+// Admin - PhoneNumber relationship (1:Many)
+db.Admin.hasMany(db.PhoneNumber, {
+  foreignKey: 'createdBy',
+  as: 'phoneNumbers'
+});
+db.PhoneNumber.belongsTo(db.Admin, {
+  foreignKey: 'createdBy',
+  as: 'creator'
 });
 
 module.exports = db;
