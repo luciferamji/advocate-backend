@@ -444,3 +444,141 @@ exports.deleteInvoice = async (req, res, next) => {
     res.status(500).json({ message: "Failed to delete invoice" });
   }
 };
+
+// @desc    Download invoices as Excel
+// @route   GET /api/invoices/download/excel
+// @access  Private
+exports.downloadInvoicesExcel = async (req, res, next) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return next(new ErrorResponse('Start date and end date are required', 'VALIDATION_ERROR'));
+    }
+
+    const where = {
+      createdAt: {
+        [Op.between]: [new Date(startDate), new Date(endDate + 'T23:59:59.999Z')]
+      }
+    };
+
+    if (req.user.role !== 'super-admin') {
+      where.advocateId = req.user.id;
+    }
+
+    const invoices = await Invoice.findAll({
+      where,
+      include: [
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['name', 'phone', 'email']
+        },
+        {
+          model: Admin,
+          as: 'advocate',
+          attributes: ['name', 'email']
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Invoices');
+
+    // Define columns
+    worksheet.columns = [
+      { header: 'Invoice ID', key: 'invoiceId', width: 20 },
+      { header: 'Client Name', key: 'clientName', width: 25 },
+      { header: 'Client Phone', key: 'clientPhone', width: 15 },
+      { header: 'Client Email', key: 'clientEmail', width: 30 },
+      { header: 'Advocate Name', key: 'advocateName', width: 25 },
+      { header: 'Amount', key: 'amount', width: 15 },
+      { header: 'Paid Amount', key: 'paidAmount', width: 15 },
+      { header: 'Remaining Amount', key: 'remainingAmount', width: 15 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Created Date', key: 'createdAt', width: 20 },
+      { header: 'Due Date', key: 'dueDate', width: 20 },
+      { header: 'Comments', key: 'comments', width: 30 }
+    ];
+
+    // Style header row
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFD3D3D3' }
+    };
+
+    // Add data rows
+    let totalAmount = 0;
+    let totalPaid = 0;
+    let totalRemaining = 0;
+
+    invoices.forEach(invoice => {
+      const amount = parseFloat(invoice.amount || 0);
+      const paidAmount = parseFloat(invoice.paidAmount || 0);
+      const remainingAmount = amount - paidAmount;
+
+      totalAmount += amount;
+      totalPaid += paidAmount;
+      totalRemaining += remainingAmount;
+
+      worksheet.addRow({
+        invoiceId: invoice.invoiceId,
+        clientName: invoice.client?.name || 'N/A',
+        clientPhone: invoice.client?.phone || 'N/A',
+        clientEmail: invoice.client?.email || 'N/A',
+        advocateName: invoice.advocate?.name || 'N/A',
+        amount: amount,
+        paidAmount: paidAmount,
+        remainingAmount: remainingAmount,
+        status: invoice.status,
+        createdAt: invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('en-IN') : 'N/A',
+        dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('en-IN') : 'N/A',
+        comments: invoice.comments || ''
+      });
+    });
+
+    // Add summary row
+    const summaryRow = worksheet.addRow({
+      invoiceId: '',
+      clientName: '',
+      clientPhone: '',
+      clientEmail: '',
+      advocateName: 'TOTAL',
+      amount: totalAmount,
+      paidAmount: totalPaid,
+      remainingAmount: totalRemaining,
+      status: '',
+      createdAt: '',
+      dueDate: '',
+      comments: ''
+    });
+
+    summaryRow.font = { bold: true };
+    summaryRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFFFEB3B' }
+    };
+
+    // Format currency columns
+    ['F', 'G', 'H'].forEach(col => {
+      worksheet.getColumn(col).numFmt = '₹#,##0.00';
+    });
+
+    // Set response headers
+    const fileName = `invoices_${startDate}_to_${endDate}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (error) {
+    console.error('Download invoices excel error:', error);
+    res.status(500).json({ message: 'Failed to download invoices' });
+  }
+};

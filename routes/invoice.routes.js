@@ -4,7 +4,8 @@ const {
   getInvoices,
   getInvoice,
   updateInvoice,
-  deleteInvoice
+  deleteInvoice,
+  downloadInvoicesExcel
 } = require('../controllers/invoice.controller');
 const { protect } = require('../middleware/auth.middleware');
 
@@ -17,6 +18,9 @@ router.use('/:invoiceId/payments', paymentRouter);
 // Protected routes
 router.route('/generate')
   .post(protect, generateInvoice);
+
+router.route('/download/excel')
+  .get(protect, downloadInvoicesExcel);
 
 router.route('/')
   .get(protect, getInvoices);
