@@ -42,6 +42,8 @@ app.use('/api/download', require('./routes/download.routes'));
 app.use('/api/invoices', require('./routes/invoice.routes'));
 app.use('/api/document-links', require('./routes/documentLink.routes'));
 app.use('/api/tasks', require('./routes/task.routes'));
+app.use('/api/phone-numbers', require('./routes/phoneNumber.routes'));
+app.use('/api/calls', require('./routes/call.routes'));
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
