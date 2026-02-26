@@ -54,20 +54,44 @@ exports.createPhoneNumber = async (req, res, next) => {
   try {
     const { name, office, place, phoneNumber, alohaaNumber } = req.body;
     
+    // Validate required fields
+    if (!name || !office || !place || !phoneNumber || !alohaaNumber) {
+      return next(new ErrorResponse('All fields are required: name, office, place, phoneNumber, alohaaNumber', 400));
+    }
+    
+    // Validate field lengths
+    if (name.trim().length < 2) {
+      return next(new ErrorResponse('Name must be at least 2 characters', 400));
+    }
+    
+    if (office.trim().length < 2) {
+      return next(new ErrorResponse('Office must be at least 2 characters', 400));
+    }
+    
+    if (place.trim().length < 2) {
+      return next(new ErrorResponse('Place must be at least 2 characters', 400));
+    }
+    
     // Validate phone number format (10 digits)
     if (!/^[0-9]{10}$/.test(phoneNumber)) {
-      return next(new ErrorResponse('Phone number must be 10 digits without country code', 400));
+      return next(new ErrorResponse('Phone number must be exactly 10 digits without country code', 400));
     }
     
     // Validate alohaa number format (10 digits)
     if (!/^[0-9]{10}$/.test(alohaaNumber)) {
-      return next(new ErrorResponse('Alohaa number must be 10 digits without country code', 400));
+      return next(new ErrorResponse('Alohaa number must be exactly 10 digits without country code', 400));
+    }
+    
+    // Check for duplicate phone number
+    const existingPhone = await PhoneNumber.findOne({ where: { phoneNumber } });
+    if (existingPhone) {
+      return next(new ErrorResponse('This phone number is already registered', 400));
     }
     
     const newPhoneNumber = await PhoneNumber.create({
-      name,
-      office,
-      place,
+      name: name.trim(),
+      office: office.trim(),
+      place: place.trim(),
       phoneNumber,
       alohaaNumber,
       createdBy: req.user.id
@@ -95,20 +119,47 @@ exports.updatePhoneNumber = async (req, res, next) => {
       return next(new ErrorResponse(`Phone number not found with id of ${req.params.id}`, 404));
     }
     
+    // Validate field lengths if provided
+    if (name !== undefined && name.trim().length < 2) {
+      return next(new ErrorResponse('Name must be at least 2 characters', 400));
+    }
+    
+    if (office !== undefined && office.trim().length < 2) {
+      return next(new ErrorResponse('Office must be at least 2 characters', 400));
+    }
+    
+    if (place !== undefined && place.trim().length < 2) {
+      return next(new ErrorResponse('Place must be at least 2 characters', 400));
+    }
+    
     // Validate phone number format if provided
-    if (phoneNumber && !/^[0-9]{10}$/.test(phoneNumber)) {
-      return next(new ErrorResponse('Phone number must be 10 digits without country code', 400));
+    if (phoneNumber !== undefined) {
+      if (!/^[0-9]{10}$/.test(phoneNumber)) {
+        return next(new ErrorResponse('Phone number must be exactly 10 digits without country code', 400));
+      }
+      
+      // Check for duplicate phone number (excluding current record)
+      const existingPhone = await PhoneNumber.findOne({ 
+        where: { 
+          phoneNumber,
+          id: { [require('sequelize').Op.ne]: req.params.id }
+        } 
+      });
+      
+      if (existingPhone) {
+        return next(new ErrorResponse('This phone number is already registered', 400));
+      }
     }
     
     // Validate alohaa number format if provided
-    if (alohaaNumber && !/^[0-9]{10}$/.test(alohaaNumber)) {
-      return next(new ErrorResponse('Alohaa number must be 10 digits without country code', 400));
+    if (alohaaNumber !== undefined && !/^[0-9]{10}$/.test(alohaaNumber)) {
+      return next(new ErrorResponse('Alohaa number must be exactly 10 digits without country code', 400));
     }
     
     phoneNumberRecord = await phoneNumberRecord.update({
-      name: name || phoneNumberRecord.name,
-      office: office || phoneNumberRecord.office,
-      place: place || phoneNumberRecord.place,
+      name: name !== undefined ? name.trim() : phoneNumberRecord.name,
+      office: office !== undefined ? office.trim() : phoneNumberRecord.office,
+      place: place !== undefined ? place.trim() : phoneNumberRecord.place,
       phoneNumber: phoneNumber || phoneNumberRecord.phoneNumber,
       alohaaNumber: alohaaNumber || phoneNumberRecord.alohaaNumber
     });
