@@ -7,7 +7,7 @@ const {
   deleteInvoice,
   downloadInvoicesExcel
 } = require('../controllers/invoice.controller');
-const { protect } = require('../middleware/auth.middleware');
+const { protect, authorize } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
@@ -20,7 +20,7 @@ router.route('/generate')
   .post(protect, generateInvoice);
 
 router.route('/download/excel')
-  .get(protect, downloadInvoicesExcel);
+  .get(protect, authorize('super-admin'), downloadInvoicesExcel);
 
 router.route('/')
   .get(protect, getInvoices);
