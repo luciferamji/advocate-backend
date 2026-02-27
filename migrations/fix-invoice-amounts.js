@@ -33,7 +33,7 @@ async function runMigration() {
       { invoiceId: 'LAWFY00000001097', amount: 30000.00, paidAmount: 30000.00, status: 'PAID' },
       { invoiceId: 'LAWFY00000001096', amount: 1000.00, paidAmount: 1000.00, status: 'PAID' },
       { invoiceId: 'LAWFY00000001095', amount: 1500.00, paidAmount: 1500.00, status: 'PAID' },
-      { invoiceId: 'LAWFY00000001094', amount: 1000.00, paidAmount: 1000.00, status: 'UNPAID' },
+      { invoiceId: 'LAWFY00000001094', amount: 1000.00, paidAmount: 0.00, status: 'UNPAID' },
       { invoiceId: 'LAWFY00000001093', amount: 1500.00, paidAmount: 1500.00, status: 'PAID' },
       { invoiceId: 'LAWFY00000001092', amount: 9500.00, paidAmount: 9500.00, status: 'PAID' },
       { invoiceId: 'LAWFY00000001091', amount: 500.00, paidAmount: 500.00, status: 'PAID' },
