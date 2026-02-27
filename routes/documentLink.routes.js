@@ -23,6 +23,6 @@ router.post('/:id/comments', protectTemp, createComment);
 router.get('/upload/chunk', protectTemp, checkChunk);
 router.post('/upload/chunk', protectTemp, uploadChunk);
 router.post('/upload/complete', protectTemp, completeUpload);
-router.get('/client',getClientsTemp)
+// router.get('/client',getClientsTemp)
 
 module.exports = router;
