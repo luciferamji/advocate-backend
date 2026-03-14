@@ -29,7 +29,7 @@ const logActivity = async (leadId, action, field, oldValue, newValue, changedBy,
 // @access  Private
 exports.createLead = async (req, res, next) => {
   try {
-    const { fullName, phone, email, reasonForCalling, notes, disposition, followUpDate, handlingOfficeId, leadSourceId } = req.body;
+    const { fullName, phone, email, reasonForCalling, notes, location, disposition, followUpDate, handlingOfficeId, leadSourceId } = req.body;
 
     if (!fullName || !phone || !reasonForCalling || !handlingOfficeId || !leadSourceId) {
       return next(new ErrorResponse('Please provide all required fields', 'VALIDATION_ERROR', {
@@ -49,7 +49,7 @@ exports.createLead = async (req, res, next) => {
 
     const lead = await Lead.create({
       leadId, fullName, phone, email: email || null, reasonForCalling, notes,
-      disposition: disposition || 'New',
+      location: location || null, disposition: disposition || 'New',
       followUpDate: followUpDate || null,
       handlingOfficeId, leadSourceId,
       createdBy: req.user.id
@@ -199,7 +199,7 @@ exports.updateLead = async (req, res, next) => {
 
     const isSuperAdmin = req.user.role === 'super-admin';
     const allowedFields = isSuperAdmin
-      ? ['fullName', 'phone', 'email', 'reasonForCalling', 'notes', 'disposition', 'followUpDate', 'handlingOfficeId', 'leadSourceId']
+      ? ['fullName', 'phone', 'email', 'reasonForCalling', 'notes', 'location', 'disposition', 'followUpDate', 'handlingOfficeId', 'leadSourceId']
       : ['disposition', 'followUpDate', 'notes'];
 
     // Validate Call Back requires followUpDate
@@ -221,7 +221,7 @@ exports.updateLead = async (req, res, next) => {
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
         // Convert empty strings to null for nullable fields
-        if ((field === 'followUpDate' || field === 'email' || field === 'notes') && !req.body[field]) {
+        if ((field === 'followUpDate' || field === 'email' || field === 'notes' || field === 'location') && !req.body[field]) {
           updateData[field] = null;
         } else {
           updateData[field] = req.body[field];
@@ -389,6 +389,7 @@ exports.exportLeads = async (req, res, next) => {
       { header: 'Reason for Calling', key: 'reasonForCalling', width: 30 },
       { header: 'Lead Source', key: 'leadSource', width: 15 },
       { header: 'Notes', key: 'notes', width: 30 },
+      { header: 'Location', key: 'location', width: 20 },
       { header: 'Disposition', key: 'disposition', width: 15 },
       { header: 'Follow-Up Date', key: 'followUpDate', width: 15 },
       { header: 'Handling Office', key: 'handlingOffice', width: 15 },
@@ -412,6 +413,7 @@ exports.exportLeads = async (req, res, next) => {
         reasonForCalling: lead.reasonForCalling,
         leadSource: lead.leadSource?.name || '',
         notes: lead.notes || '',
+        location: lead.location || '',
         disposition: lead.disposition,
         followUpDate: lead.followUpDate || '',
         handlingOffice: lead.handlingOffice?.name || '',
