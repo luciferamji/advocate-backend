@@ -16,7 +16,13 @@ module.exports = (sequelize, DataTypes) => {
     },
     phone: {
       type: DataTypes.STRING,
-      allowNull: false
+      allowNull: false,
+      validate: {
+        is: {
+          args: /^[0-9]{10}$/,
+          msg: 'Phone number must be exactly 10 digits'
+        }
+      }
     },
     email: {
       type: DataTypes.STRING,

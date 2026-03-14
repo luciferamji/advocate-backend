@@ -37,6 +37,10 @@ exports.createLead = async (req, res, next) => {
       }));
     }
 
+    if (!/^[0-9]{10}$/.test(phone)) {
+      return next(new ErrorResponse('Phone number must be exactly 10 digits', 'VALIDATION_ERROR'));
+    }
+
     if (disposition === 'Call Back' && !followUpDate) {
       return next(new ErrorResponse('Follow-up date is required when disposition is Call Back', 'VALIDATION_ERROR'));
     }
@@ -47,6 +51,7 @@ exports.createLead = async (req, res, next) => {
       leadId, fullName, phone, email: email || null, reasonForCalling, notes,
       disposition: disposition || 'New',
       followUpDate: followUpDate || null,
+      handlingOfficeId, leadSourceId,
       createdBy: req.user.id
     });
 
