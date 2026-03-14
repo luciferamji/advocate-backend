@@ -37,6 +37,10 @@ db.Invoice = require('./invoice.model')(sequelize, Sequelize);
 db.InvoicePayment = require('./invoicePayment.model')(sequelize, Sequelize);
 db.Task = require('./task.model')(sequelize, Sequelize);
 db.PhoneNumber = require('./phoneNumber.model')(sequelize, Sequelize);
+db.HandlingOffice = require('./handlingOffice.model')(sequelize, Sequelize);
+db.LeadSource = require('./leadSource.model')(sequelize, Sequelize);
+db.Lead = require('./lead.model')(sequelize, Sequelize);
+db.LeadActivityLog = require('./leadActivityLog.model')(sequelize, Sequelize);
 
 // Define associations
 
@@ -269,6 +273,52 @@ db.Admin.hasMany(db.PhoneNumber, {
 db.PhoneNumber.belongsTo(db.Admin, {
   foreignKey: 'createdBy',
   as: 'creator'
+});
+
+// Lead Management associations
+db.HandlingOffice.hasMany(db.Lead, {
+  foreignKey: 'handlingOfficeId',
+  as: 'leads'
+});
+db.Lead.belongsTo(db.HandlingOffice, {
+  foreignKey: 'handlingOfficeId',
+  as: 'handlingOffice'
+});
+
+db.LeadSource.hasMany(db.Lead, {
+  foreignKey: 'leadSourceId',
+  as: 'leads'
+});
+db.Lead.belongsTo(db.LeadSource, {
+  foreignKey: 'leadSourceId',
+  as: 'leadSource'
+});
+
+db.Admin.hasMany(db.Lead, {
+  foreignKey: 'createdBy',
+  as: 'leads'
+});
+db.Lead.belongsTo(db.Admin, {
+  foreignKey: 'createdBy',
+  as: 'owner'
+});
+
+db.Lead.hasMany(db.LeadActivityLog, {
+  foreignKey: 'leadId',
+  as: 'activityLogs'
+});
+db.LeadActivityLog.belongsTo(db.Lead, {
+  foreignKey: 'leadId',
+  as: 'lead'
+});
+
+db.Admin.hasMany(db.LeadActivityLog, {
+  foreignKey: 'changedBy',
+  as: 'leadActivities'
+});
+db.LeadActivityLog.belongsTo(db.Admin, {
+  foreignKey: 'changedBy',
+  as: 'changedByUser'
 });
 
 module.exports = db;
