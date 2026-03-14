@@ -2,6 +2,7 @@ const express = require('express');
 const {
   getHearings,
   getHearing,
+  getOverdueHearings,
   createHearing,
   updateHearing,
   deleteHearing,
@@ -15,6 +16,10 @@ const router = express.Router();
 
 router.route('/comments/:commentId')
   .delete(protect, deleteHearingComment);
+
+// Overdue route must come before /:id
+router.route('/overdue')
+  .get(protect, getOverdueHearings);
 
 // Protected routes
 router.route('/')

@@ -5,6 +5,71 @@ const { upload } = require('../utils/fileUpload');
 const { moveFileFromTemp } = require('../utils/fileTransfer');
 const { deleteFile } = require('../utils/fileDelete');
 
+// @desc    Get overdue hearings
+// @route   GET /api/hearings/overdue
+// @access  Private
+exports.getOverdueHearings = async (req, res, next) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+
+    // Role-scoped: advocates only see their own cases
+    const caseWhereClause = {};
+    if (req.user.role !== 'super-admin') {
+      caseWhereClause.advocateId = req.user.id;
+    }
+
+    const hearings = await Hearing.findAll({
+      where: {
+        [Op.or]: [
+          { status: 'overdue' },
+          {
+            status: 'scheduled',
+            date: { [Op.lt]: today }
+          }
+        ]
+      },
+      include: [
+        {
+          model: Case,
+          as: 'case',
+          where: caseWhereClause,
+          required: true,
+          include: [
+            {
+              model: Client,
+              as: 'client',
+              attributes: ['id', 'name']
+            }
+          ]
+        }
+      ],
+      order: [['date', 'DESC'], ['time', 'DESC']]
+    });
+
+    const result = hearings.map(hearing => ({
+      id: hearing.id.toString(),
+      caseId: hearing.case.id.toString(),
+      caseNumber: hearing.case.caseNumber,
+      caseName: hearing.case.title,
+      clientId: hearing.case.client.id.toString(),
+      clientName: hearing.case.client.name,
+      date: hearing.date,
+      time: hearing.time,
+      courtName: hearing.courtName,
+      purpose: hearing.purpose,
+      judge: hearing.judge,
+      status: 'overdue'
+    }));
+
+    res.status(200).json({
+      count: result.length,
+      hearings: result
+    });
+  } catch (error) {
+    next(new ErrorResponse(error.message, 'OVERDUE_HEARINGS_ERROR'));
+  }
+};
+
 // @desc    Get all hearings
 // @route   GET /api/hearings
 // @access  Private
