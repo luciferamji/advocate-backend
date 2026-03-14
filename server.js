@@ -91,4 +91,5 @@ startServer();
 //cron declaration
 require('./cron/nextDayHearingCron');
 require('./cron/linkCleanupCron');
-require('./cron/invoiceReminderCron')
+require('./cron/invoiceReminderCron');
+require('./cron/overdueHearingCron');
