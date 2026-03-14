@@ -61,9 +61,52 @@ exports.getOverdueHearings = async (req, res, next) => {
       status: 'overdue'
     }));
 
+    // Find OPEN cases with no future scheduled hearing
+    // Use subquery: get case IDs that DO have a future scheduled hearing, then exclude them
+    const caseIdsWithFutureHearing = await Hearing.findAll({
+      attributes: ['caseId'],
+      where: {
+        date: { [Op.gte]: today },
+        status: 'scheduled'
+      },
+      group: ['caseId'],
+      raw: true
+    });
+    const excludeIds = caseIdsWithFutureHearing.map(h => h.caseId);
+
+    const noHearingWhere = {
+      status: 'OPEN',
+      ...(caseWhereClause)
+    };
+    if (excludeIds.length > 0) {
+      noHearingWhere.id = { [Op.notIn]: excludeIds };
+    }
+
+    const casesWithNoHearing = await Case.findAll({
+      where: noHearingWhere,
+      include: [
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'name']
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    const noHearingCases = casesWithNoHearing.map(c => ({
+      id: c.id.toString(),
+      caseNumber: c.caseNumber,
+      caseName: c.title,
+      clientId: c.client.id.toString(),
+      clientName: c.client.name,
+      courtName: c.courtName
+    }));
+
     res.status(200).json({
       count: result.length,
-      hearings: result
+      hearings: result,
+      noHearingCases
     });
   } catch (error) {
     next(new ErrorResponse(error.message, 'OVERDUE_HEARINGS_ERROR'));

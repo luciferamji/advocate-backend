@@ -43,6 +43,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: true
     },
+    location: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
     disposition: {
       type: DataTypes.ENUM('New', 'Call Back', 'Not Interested', 'Onboarded', 'Others'),
       allowNull: false,
