@@ -18,7 +18,8 @@ exports.searchClients = async (req, res, next) => {
     const whereClause = {
       [Op.or]: [
         { name: { [Op.iLike]: `%${search}%` } },
-        { clientId: { [Op.iLike]: `%${search}%` } }
+        { clientId: { [Op.iLike]: `%${search}%` } },
+        { phone: { [Op.iLike]: `%${search}%` } }
       ]
     };
 
@@ -80,7 +81,8 @@ exports.getClients = async (req, res, next) => {
       whereClause[Op.or] = [
         { name: { [Op.iLike]: `%${search}%` } },
         { email: { [Op.iLike]: `%${search}%` } },
-        { clientId: { [Op.iLike]: `%${search}%` } }
+        { clientId: { [Op.iLike]: `%${search}%` } },
+        { phone: { [Op.iLike]: `%${search}%` } }
       ];
     }
 
@@ -150,7 +152,8 @@ exports.getClientsTemp = async (req, res, next) => {
       whereClause[Op.or] = [
         { name: { [Op.iLike]: `%${search}%` } },
         { email: { [Op.iLike]: `%${search}%` } },
-        { clientId: { [Op.iLike]: `%${search}%` } }
+        { clientId: { [Op.iLike]: `%${search}%` } },
+        { phone: { [Op.iLike]: `%${search}%` } }
       ];
     }
 
@@ -256,14 +259,17 @@ exports.createClient = async (req, res, next) => {
       return next(new ErrorResponse('Name is required', 'VALIDATION_ERROR'));
     }
 
+    // Normalize phone to last 10 digits
+    const normalizedPhone = phone ? phone.replace(/\D/g, '').slice(-10) : '';
+
     // Check if phone number already exists
-    if (phone) {
-      const existingClient = await Client.findOne({ where: { phone } });
+    if (normalizedPhone) {
+      const existingClient = await Client.findOne({ where: { phone: normalizedPhone } });
       if (existingClient) {
         return next(new ErrorResponse(
           'A client with this phone number already exists',
           'DUPLICATE_PHONE',
-          { phone, existingClientName: existingClient.name }
+          { phone: normalizedPhone, existingClientName: existingClient.name }
         ));
       }
     }
@@ -275,7 +281,7 @@ exports.createClient = async (req, res, next) => {
       name,
       clientId,
       email,
-      phone,
+      phone: normalizedPhone,
       address,
       createdBy: req.user.id
     });
@@ -317,6 +323,11 @@ exports.updateClient = async (req, res, next) => {
     // Check ownership if not super-admin
     if (req.user.role !== 'super-admin' && client.createdBy !== req.user.id) {
       return next(new ErrorResponse('Not authorized to update this client', 'UNAUTHORIZED_ACCESS'));
+    }
+
+    // Normalize phone if provided
+    if (req.body.phone) {
+      req.body.phone = req.body.phone.replace(/\D/g, '').slice(-10);
     }
 
     // Update client
