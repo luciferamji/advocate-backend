@@ -2,6 +2,8 @@ const { Lead, HandlingOffice, LeadSource, Admin, LeadActivityLog, sequelize } = 
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
+const { sendEmail } = require('../utils/email');
+const { generateConsultationRequestEmail } = require('../emailTemplates/consultationRequest');
 
 // Helper: generate next lead ID
 const generateLeadId = async () => {
@@ -429,5 +431,74 @@ exports.exportLeads = async (req, res, next) => {
     res.end();
   } catch (error) {
     next(new ErrorResponse(error.message, 'LEAD_EXPORT_ERROR'));
+  }
+};
+
+
+// @desc    Request consultation (public - from www.lawfyco.com)
+// @route   POST /api/leads/consultation
+// @access  Public
+exports.requestConsultation = async (req, res, next) => {
+  try {
+    const { fullName, phone, email, message } = req.body;
+
+    if (!fullName || !phone) {
+      return next(new ErrorResponse('Name and phone number are required', 'VALIDATION_ERROR', {
+        required: ['fullName', 'phone']
+      }));
+    }
+
+    if (!/^[0-9]{10}$/.test(phone)) {
+      return next(new ErrorResponse('Phone number must be exactly 10 digits', 'VALIDATION_ERROR'));
+    }
+
+    // Find or create "Website" lead source
+    let leadSource = await LeadSource.findOne({ where: { name: 'Website' } });
+    if (!leadSource) {
+      leadSource = await LeadSource.findOne({ where: { status: 'active' } });
+    }
+
+    // Find default handling office (first active one)
+    const handlingOffice = await HandlingOffice.findOne();
+
+    // Find a super-admin to assign as default owner
+    const defaultOwner = await Admin.findOne({ where: { role: 'super-admin' } });
+
+    if (!leadSource || !handlingOffice || !defaultOwner) {
+      return next(new ErrorResponse('System configuration incomplete. Please contact support.', 'CONFIG_ERROR'));
+    }
+
+    const leadId = await generateLeadId();
+
+    const lead = await Lead.create({
+      leadId,
+      fullName,
+      phone,
+      email: email || null,
+      reasonForCalling: message || 'Consultation request from website',
+      notes: 'Submitted via www.lawfyco.com',
+      location: null,
+      disposition: 'New',
+      followUpDate: null,
+      handlingOfficeId: handlingOffice.id,
+      leadSourceId: leadSource.id,
+      createdBy: defaultOwner.id
+    });
+
+    // Send notification email
+    sendEmail(generateConsultationRequestEmail({
+      fullName,
+      phone,
+      email: email || null,
+      message: message || 'N/A',
+      leadId
+    }));
+
+    res.status(201).json({
+      success: true,
+      message: 'Consultation request submitted successfully. Our team will contact you shortly.'
+    });
+  } catch (error) {
+    next(new ErrorResponse(error.message, 'CONSULTATION_REQUEST_ERROR'));
   }
 };

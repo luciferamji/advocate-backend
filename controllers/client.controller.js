@@ -256,6 +256,18 @@ exports.createClient = async (req, res, next) => {
       return next(new ErrorResponse('Name is required', 'VALIDATION_ERROR'));
     }
 
+    // Check if phone number already exists
+    if (phone) {
+      const existingClient = await Client.findOne({ where: { phone } });
+      if (existingClient) {
+        return next(new ErrorResponse(
+          'A client with this phone number already exists',
+          'DUPLICATE_PHONE',
+          { phone, existingClientName: existingClient.name }
+        ));
+      }
+    }
+
     // Generate unique client ID
     const clientId = `CL${Date.now().toString().slice(-6)}`;
 

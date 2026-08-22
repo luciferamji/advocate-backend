@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 
-
+// Emails to exclude from CC
+const EXCLUDED_CC_EMAILS = ['ask@lawfyco.in'];
 
 const sendEmail = async (options) => {
   // Create transporter
@@ -14,6 +15,11 @@ const sendEmail = async (options) => {
     }
   });
 
+  // Filter out excluded emails from CC
+  const ccList = (options.cc || []).filter(
+    email => !EXCLUDED_CC_EMAILS.includes(email?.toLowerCase())
+  );
+
   // Message options
   const message = {
     from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
@@ -21,7 +27,7 @@ const sendEmail = async (options) => {
     subject: options.subject,
     html: options.html,
     attachments: options.attachments || [],
-    cc: options.cc || []
+    cc: ccList
   };
 
   // Send email

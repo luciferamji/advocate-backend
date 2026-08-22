@@ -1,11 +1,15 @@
 const express = require('express');
 const {
   createLead, getLeads, getLeadById, updateLead, deleteLead,
-  getLeadStats, exportLeads
+  getLeadStats, exportLeads, requestConsultation
 } = require('../controllers/lead.controller');
 const { protect, authorize } = require('../middleware/auth.middleware');
 
 const router = express.Router();
+
+// Public route - consultation request from website
+router.route('/consultation')
+  .post(requestConsultation);
 
 router.route('/stats')
   .get(protect, authorize('super-admin'), getLeadStats);
