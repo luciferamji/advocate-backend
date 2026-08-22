@@ -440,11 +440,11 @@ exports.exportLeads = async (req, res, next) => {
 // @access  Public
 exports.requestConsultation = async (req, res, next) => {
   try {
-    const { fullName, phone, email, message } = req.body;
+    const { fullName, phone, email, areaOfLaw, preferredDate, preferredTime, legalMatter } = req.body;
 
-    if (!fullName || !phone) {
-      return next(new ErrorResponse('Name and phone number are required', 'VALIDATION_ERROR', {
-        required: ['fullName', 'phone']
+    if (!fullName || !phone || !email || !areaOfLaw || !preferredDate || !preferredTime || !legalMatter) {
+      return next(new ErrorResponse('All required fields must be provided', 'VALIDATION_ERROR', {
+        required: ['fullName', 'phone', 'email', 'areaOfLaw', 'preferredDate', 'preferredTime', 'legalMatter']
       }));
     }
 
@@ -474,12 +474,12 @@ exports.requestConsultation = async (req, res, next) => {
       leadId,
       fullName,
       phone,
-      email: email || null,
-      reasonForCalling: message || 'Consultation request from website',
-      notes: 'Submitted via www.lawfyco.com',
+      email,
+      reasonForCalling: `[${areaOfLaw}] ${legalMatter}`,
+      notes: `Consultation request from www.lawfyco.com\nArea of Law: ${areaOfLaw}\nPreferred Date: ${preferredDate}\nPreferred Time: ${preferredTime}`,
       location: null,
       disposition: 'New',
-      followUpDate: null,
+      followUpDate: preferredDate,
       handlingOfficeId: handlingOffice.id,
       leadSourceId: leadSource.id,
       createdBy: defaultOwner.id
@@ -489,8 +489,11 @@ exports.requestConsultation = async (req, res, next) => {
     sendEmail(generateConsultationRequestEmail({
       fullName,
       phone,
-      email: email || null,
-      message: message || 'N/A',
+      email,
+      areaOfLaw,
+      preferredDate,
+      preferredTime,
+      legalMatter,
       leadId
     }));
 
