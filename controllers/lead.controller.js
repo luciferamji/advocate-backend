@@ -452,6 +452,18 @@ exports.requestConsultation = async (req, res, next) => {
       return next(new ErrorResponse('Phone number must be exactly 10 digits', 'VALIDATION_ERROR'));
     }
 
+    // Check for duplicate: same phone with active dispositions
+    const existingLead = await Lead.findOne({
+      where: { phone, disposition: 'New' }
+    });
+
+    if (existingLead) {
+      return res.status(200).json({
+        success: true,
+        message: 'Consultation request submitted successfully. Our team will contact you shortly.'
+      });
+    }
+
     // Find or create "Website" lead source
     let leadSource = await LeadSource.findOne({ where: { name: 'Website' } });
     if (!leadSource) {
