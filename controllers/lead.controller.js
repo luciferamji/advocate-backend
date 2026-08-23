@@ -468,14 +468,17 @@ exports.requestConsultation = async (req, res, next) => {
     // Find or create "Website" lead source
     let leadSource = await LeadSource.findOne({ where: { name: 'Website' } });
     if (!leadSource) {
-      leadSource = await LeadSource.findOne({ where: { status: 'active' } });
+      leadSource = await LeadSource.create({ name: 'Website', status: 'active' });
     }
 
     // Find default handling office (first active one)
     const handlingOffice = await HandlingOffice.findOne();
 
-    // Find a super-admin to assign as default owner
-    const defaultOwner = await Admin.findOne({ where: { role: 'super-admin' } });
+    // Find "Website" admin as owner, fallback to any super-admin
+    let defaultOwner = await Admin.findOne({ where: { email: 'website@lawfyco.com' } });
+    if (!defaultOwner) {
+      defaultOwner = await Admin.findOne({ where: { role: 'super-admin' } });
+    }
 
     if (!leadSource || !handlingOffice || !defaultOwner) {
       return next(new ErrorResponse('System configuration incomplete. Please contact support.', 'CONFIG_ERROR'));
@@ -512,6 +515,7 @@ exports.requestConsultation = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
+      leadId,
       message: 'Consultation request submitted successfully. Our team will contact you shortly.'
     });
   } catch (error) {
