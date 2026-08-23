@@ -461,6 +461,7 @@ exports.requestConsultation = async (req, res, next) => {
       return res.status(200).json({
         success: true,
         duplicate: true,
+        leadId: existingLead.leadId,
         message: 'We already have your consultation request. Our team will reach out to you soon.'
       });
     }
