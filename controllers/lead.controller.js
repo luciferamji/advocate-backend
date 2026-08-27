@@ -442,9 +442,9 @@ exports.requestConsultation = async (req, res, next) => {
   try {
     const { fullName, phone, email, areaOfLaw, preferredDate, preferredTime, legalMatter } = req.body;
 
-    if (!fullName || !phone || !email || !areaOfLaw || !preferredDate || !preferredTime || !legalMatter) {
+    if (!fullName || !phone || !areaOfLaw || !preferredDate || !preferredTime || !legalMatter) {
       return next(new ErrorResponse('All required fields must be provided', 'VALIDATION_ERROR', {
-        required: ['fullName', 'phone', 'email', 'areaOfLaw', 'preferredDate', 'preferredTime', 'legalMatter']
+        required: ['fullName', 'phone', 'areaOfLaw', 'preferredDate', 'preferredTime', 'legalMatter']
       }));
     }
 
