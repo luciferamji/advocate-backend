@@ -3,7 +3,7 @@ jest.mock('../utils/email', () => ({ sendEmail: jest.fn().mockResolvedValue() })
 const request = require('supertest');
 const app = require('../app');
 const { sendEmail } = require('../utils/email');
-const { db, resetDb, createOffice, createUser } = require('./helpers');
+const { db, resetDb, createOffice, createUser, as } = require('./helpers');
 const { findOfficeForLocation, canonicalOfficeName } = require('../utils/offices');
 
 const { Lead, LeadActivityLog, HandlingOffice, sequelize } = db;
@@ -84,12 +84,34 @@ describe('website consultation routing', () => {
     expect(log.meta).toMatchObject({ routing: 'fallback_no_active_advocate', fallbackToSystem: true });
   });
 
-  test('unknown location falls back to the system super-admin', async () => {
+  test('unknown location: no office, super-admin only until transferred', async () => {
     const res = await consult('Mumbai');
     const lead = await leadFor(res);
-    expect(lead.assignedTo).toBe(system.id);
+    expect(lead).toMatchObject({ assignedTo: system.id, handlingOfficeId: null });
     const log = await LeadActivityLog.findOne({ where: { leadId: lead.id } });
-    expect(log.meta).toMatchObject({ routing: 'fallback_no_office_match', fallbackToSystem: true, officeMatched: false });
+    expect(log.meta).toMatchObject({ routing: 'fallback_no_office_match', fallbackToSystem: true, officeMatched: false, handlingOfficeId: null });
+
+    // no advocate sees it (not theirs, no office)
+    const asC1 = await as(app, c1).get(`/api/leads/${lead.id}`);
+    expect(asC1.status).toBe(404);
+    const list = await as(app, c1).get('/api/leads?limit=100');
+    expect(JSON.stringify(list.body)).not.toContain(lead.leadId);
+    // the super-admin sees it
+    const asSystem = await as(app, system).get(`/api/leads/${lead.id}`);
+    expect(asSystem.status).toBe(200);
+
+    // transferring it to an advocate moves it into that advocate's office
+    const tr = await as(app, system).post(`/api/leads/${lead.id}/transfer`).send({ toAdvocateId: c2.id, reason: 'Routed by admin' });
+    expect(tr.status).toBe(200);
+    await lead.reload();
+    expect(lead).toMatchObject({ assignedTo: c2.id, handlingOfficeId: bengaluru.id });
+  });
+
+  test('no city at all is treated like an unknown location', async () => {
+    const res = await consult(undefined);
+    expect(res.status).toBe(201);
+    const lead = await leadFor(res);
+    expect(lead).toMatchObject({ assignedTo: system.id, handlingOfficeId: null });
   });
 
   test('duplicate phone with a New lead is not re-created', async () => {

@@ -109,6 +109,10 @@ async function runMigration({ log = console.log } = {}) {
     await q(`ALTER TABLE leads ALTER COLUMN "assignedTo" SET NOT NULL;`);
     log('✓ leads."assignedTo" NOT NULL (+ insert default trigger)');
 
+    // 3b. Office optional: a website lead without a usable city waits with the super-admin (no office)
+    await q(`ALTER TABLE leads ALTER COLUMN "handlingOfficeId" DROP NOT NULL;`);
+    log('✓ leads."handlingOfficeId" nullable (unrouted website leads)');
+
     // 4. Soft delete
     await addColumn('leads', 'deletedAt', 'TIMESTAMP WITH TIME ZONE NULL', log, transaction);
 

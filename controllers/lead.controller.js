@@ -131,7 +131,10 @@ exports.getLeads = async (req, res, next) => {
       filters.disposition = { [Op.in]: disposition.split(',') };
     }
 
-    if (handlingOfficeId) {
+    if (handlingOfficeId === 'none') {
+      // "Not routed": website leads without an office (only super-admins can see them)
+      filters.handlingOfficeId = { [Op.is]: null };
+    } else if (handlingOfficeId) {
       const offices = handlingOfficeId.split(',').filter(isUuid);
       filters.handlingOfficeId = { [Op.in]: offices };
     }
@@ -371,8 +374,10 @@ exports.transferLead = async (req, res, next) => {
       }
 
       let toOffice = null;
-      if (toOfficeId && toOfficeId !== lead.handlingOfficeId) {
-        toOffice = await HandlingOffice.findOne({ where: { id: toOfficeId, status: 'active' }, transaction });
+      // An unrouted lead (no office, e.g. a website lead without a city) takes the new advocate's office.
+      const wantedOfficeId = toOfficeId || (!lead.handlingOfficeId && target && target.handlingOfficeId) || null;
+      if (wantedOfficeId && wantedOfficeId !== lead.handlingOfficeId) {
+        toOffice = await HandlingOffice.findOne({ where: { id: wantedOfficeId, status: 'active' }, transaction });
         if (!toOffice) throw badRequest('Target office not found or inactive');
       }
       if (!target && !toOffice) throw badRequest('Nothing to transfer');
@@ -649,8 +654,9 @@ exports.exportLeads = async (req, res, next) => {
 // @route   POST /api/leads/consultation
 // @access  Public
 // Routing: office from the location/city text (Bangalore == Bengaluru), then
-// round-robin among the office's ACTIVE advocates. No matching office or no
-// active advocate -> assigned to the system super-admin (flagged in audit meta).
+// round-robin among the office's ACTIVE advocates. No city / no matching office -> no office, assigned to
+// the system super-admin (super-admins only) until transferred; office without an active advocate ->
+// kept in that office, assigned to the system super-admin. Both flagged in audit meta.
 exports.requestConsultation = async (req, res, next) => {
   try {
     const { fullName, phone, email, areaOfLaw, preferredDate, preferredTime, legalMatter } = req.body;
@@ -691,7 +697,7 @@ exports.requestConsultation = async (req, res, next) => {
       const systemUser = await getSystemUser(transaction);
       const { office, matched } = await resolveWebsiteOffice(location, transaction);
 
-      if (!leadSource || !office || !systemUser) {
+      if (!leadSource || !systemUser) {
         throw new ErrorResponse('System configuration incomplete. Please contact support.', 'CONFIG_ERROR');
       }
 
@@ -712,7 +718,7 @@ exports.requestConsultation = async (req, res, next) => {
         location: location || null,
         disposition: 'New',
         followUpDate: preferredDate,
-        handlingOfficeId: office.id,
+        handlingOfficeId: office ? office.id : null,
         leadSourceId: leadSource.id,
         createdBy: systemUser.id,
         assignedTo: assignee.id
@@ -723,7 +729,7 @@ exports.requestConsultation = async (req, res, next) => {
         meta: {
           source: 'website', routing, fallbackToSystem: !advocate,
           location: location || null, officeMatched: matched,
-          handlingOfficeId: office.id, handlingOfficeName: office.name,
+          handlingOfficeId: office ? office.id : null, handlingOfficeName: office ? office.name : null,
           assignedTo: assignee.id, assignedToName: assignee.name
         }
       });

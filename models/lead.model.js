@@ -57,8 +57,9 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true
     },
     handlingOfficeId: {
+      // NULL = not routed yet (website lead without a usable city): only super-admins see it until transferred
       type: DataTypes.UUID,
-      allowNull: false
+      allowNull: true
     },
     leadSourceId: {
       type: DataTypes.UUID,

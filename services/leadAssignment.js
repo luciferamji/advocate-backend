@@ -31,17 +31,14 @@ const pickRoundRobinAdvocate = async (officeId, transaction) => {
   return next;
 };
 
-// Office for a website lead: from the location/city text, otherwise the
-// WEBSITE_DEFAULT_OFFICE (by name), otherwise the first active office.
+// Office for a website lead from the location/city text. No match (or no city) -> no office: the lead
+// waits with the super-admin, visible to super-admins only, until transferred to an advocate / office.
 const resolveWebsiteOffice = async (location, transaction) => {
   const offices = await HandlingOffice.findAll({
     where: { status: 'active' }, order: [['name', 'ASC']], transaction
   });
   const matched = findOfficeForLocation(location, offices);
-  if (matched) return { office: matched, matched: true };
-  const fallbackName = process.env.WEBSITE_DEFAULT_OFFICE;
-  const fallback = (fallbackName && findOfficeForLocation(fallbackName, offices)) || offices[0] || null;
-  return { office: fallback, matched: false };
+  return matched ? { office: matched, matched: true } : { office: null, matched: false };
 };
 
 module.exports = { getSystemUser, activeAdvocatesOfOffice, pickRoundRobinAdvocate, resolveWebsiteOffice };
