@@ -24,3 +24,5 @@ uploads/
 # System Files
 .DS_Store
 Thumbs.db
+# Local DB backups (scripts/db-backup.js)
+backups/
