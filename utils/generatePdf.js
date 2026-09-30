@@ -3,12 +3,15 @@ const ejs = require("ejs");
 const fs = require("fs");
 const path = require("path");
 
-// One shared Chrome for all PDFs, one PDF at a time. The server is a small shared box: a Chrome per request
-// (with --single-process) leaked and grew to 2.6 GB, which took the whole server down (OOM, 30 Sep 2026).
+// One shared Chrome for all PDFs, one PDF at a time. The server is a small shared box: a new Chrome per request
+// (plus retries) grew to 2.6 GB and took the whole server down (OOM, 30 Sep 2026).
+// Messages use console.log: on the server stderr goes to a deleted file, so console.error is never seen.
 const JOB_TIMEOUT_MS = 45000; // whole job: render + pdf
-const MAX_JOBS_PER_BROWSER = 50; // recycle Chrome regularly so memory never creeps up
+const MAX_JOBS_PER_BROWSER = 20; // recycle Chrome regularly so memory never creeps up
 const IDLE_CLOSE_MS = 2 * 60 * 1000; // close Chrome when no PDF was made for 2 minutes
 
+// --single-process / --no-zygote are required on the server: Chrome's separate renderer never comes up there
+// (page detaches / Network.enable times out). Single-process Chrome grows over time, hence the recycling below.
 const LAUNCH_ARGS = [
   "--no-sandbox",
   "--disable-setuid-sandbox",
@@ -17,7 +20,8 @@ const LAUNCH_ARGS = [
   "--disable-extensions",
   "--disable-background-networking",
   "--no-first-run",
-  "--renderer-process-limit=1",
+  "--no-zygote",
+  "--single-process",
   "--js-flags=--max-old-space-size=256",
 ];
 
@@ -53,7 +57,7 @@ const killBrowser = async () => {
   try {
     await Promise.race([b.close(), new Promise((_, reject) => setTimeout(() => reject(new Error("close timeout")), 5000))]);
   } catch (err) {
-    console.warn("Chrome did not close cleanly, killing it:", err.message);
+    console.log("Chrome did not close cleanly, killing it:", err.message);
     const proc = b.process();
     if (proc && !proc.killed) proc.kill("SIGKILL");
   }
@@ -122,7 +126,7 @@ exports.generatePdf = async (data, template_name) => {
     try {
       return await runJob(html);
     } catch (firstErr) {
-      console.error("PDF generation failed, retrying once with a fresh Chrome:", firstErr.message);
+      console.log("PDF generation failed, retrying once with a fresh Chrome:", firstErr.message);
       return runJob(html);
     }
   });
@@ -130,7 +134,7 @@ exports.generatePdf = async (data, template_name) => {
   try {
     return await job;
   } catch (err) {
-    console.error("PDF generation failed:", err.message);
+    console.log("PDF generation failed:", err.message);
     throw new Error("Failed to generate PDF after multiple attempts.");
   }
 };
