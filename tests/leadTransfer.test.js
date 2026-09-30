@@ -62,12 +62,15 @@ describe('lead transfer rules', () => {
     expect((await transfer(a1, lead, { toAdvocateId: a1.id, reason: 'take it back' })).status).toBe(403);
   });
 
-  test('advocate cannot transfer to another office', async () => {
+  test('advocate can transfer own lead to an advocate in another office; the lead moves there', async () => {
     const lead = await createLead({ office: delhi, source, assignee: a1 });
-    const res = await transfer(a1, lead, { toAdvocateId: b1.id, reason: 'wrong office' });
-    expect(res.status).toBe(403);
+    const res = await transfer(a1, lead, { toAdvocateId: b1.id, reason: 'client is in Kolkata' });
+    expect(res.status).toBe(200);
     await lead.reload();
-    expect(lead.assignedTo).toBe(a1.id);
+    expect(lead).toMatchObject({ assignedTo: b1.id, handlingOfficeId: kolkata.id });
+    // a1 no longer sees it (not theirs, not their office); b1 owns it
+    expect((await as(app, a1).get(`/api/leads/${lead.id}`)).status).toBe(404);
+    expect((await as(app, b1).put(`/api/leads/${lead.id}`).send({ notes: 'mine now' })).status).toBe(200);
   });
 
   test('advocate cannot move a lead to another office', async () => {
@@ -95,9 +98,11 @@ describe('lead transfer rules', () => {
     expect((await transfer(a1, other, { toAdvocateId: a1.id, reason: 'mine now' })).status).toBe(404);
   });
 
-  test('advocate without an office cannot transfer', async () => {
+  test('advocate without an office can still hand over their own lead', async () => {
     const lead = await createLead({ office: delhi, source, assignee: noOffice });
-    expect((await transfer(noOffice, lead, { toAdvocateId: a2.id, reason: 'no office' })).status).toBe(403);
+    expect((await transfer(noOffice, lead, { toAdvocateId: a2.id, reason: 'no office' })).status).toBe(200);
+    await lead.reload();
+    expect(lead).toMatchObject({ assignedTo: a2.id, handlingOfficeId: delhi.id });
   });
 
   test('super-admin can transfer across offices and change the office in one transaction', async () => {
@@ -137,16 +142,18 @@ describe('assignable advocates', () => {
   test('advocate gets active colleagues of their office only (not self, not inactive)', async () => {
     const res = await as(app, a1).get('/api/leads/assignable-advocates');
     expect(res.status).toBe(200);
-    expect(res.body.advocates.map(a => a.id)).toEqual([a2.id]);
+    expect(res.body.advocates.map(a => a.id).sort()).toEqual([a2.id, b1.id].sort());
   });
 
-  test('advocate cannot list another office', async () => {
-    expect((await as(app, a1).get(`/api/leads/assignable-advocates?officeId=${kolkata.id}`)).status).toBe(403);
+  test('advocate can list another office', async () => {
+    const res = await as(app, a1).get(`/api/leads/assignable-advocates?officeId=${kolkata.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.advocates.map(a => a.id)).toEqual([b1.id]);
   });
 
-  test('advocate without office gets an empty list', async () => {
-    const res = await as(app, noOffice).get('/api/leads/assignable-advocates');
-    expect(res.body.advocates).toEqual([]);
+  test('advocates without an office are never offered as targets', async () => {
+    const res = await as(app, a2).get('/api/leads/assignable-advocates');
+    expect(res.body.advocates.map(a => a.id)).not.toContain(noOffice.id);
   });
 
   test('super-admin can list any office or all active advocates', async () => {

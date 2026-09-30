@@ -203,13 +203,13 @@ exports.getAssignableAdvocates = async (req, res, next) => {
         where.handlingOfficeId = officeId;
       }
     } else {
-      if (!req.user.handlingOfficeId) {
-        return res.status(200).json({ advocates: [] });
+      // Advocates may hand their own leads to an advocate in any office (owner, 30 Sep 2026)
+      if (officeId) {
+        if (!isUuid(officeId)) return next(badRequest('Invalid officeId'));
+        where.handlingOfficeId = officeId;
+      } else {
+        where.handlingOfficeId = { [Op.ne]: null };
       }
-      if (officeId && officeId !== req.user.handlingOfficeId) {
-        return next(forbidden('You can only transfer leads within your office'));
-      }
-      where.handlingOfficeId = req.user.handlingOfficeId;
       where.id = { [Op.ne]: req.user.id };
     }
 
@@ -363,19 +363,17 @@ exports.transferLead = async (req, res, next) => {
         if (!target) throw badRequest('Target advocate not found');
         if (target.status !== 'active') throw badRequest('Target advocate is inactive');
         if (target.id === lead.assignedTo) throw badRequest('Lead is already assigned to this advocate');
-        if (!superAdmin) {
-          if (!req.user.handlingOfficeId) {
-            throw forbidden('You are not assigned to an office yet; ask a super-admin to transfer this lead');
-          }
-          if (target.handlingOfficeId !== req.user.handlingOfficeId) {
-            throw forbidden('You can only transfer leads to an advocate in your office');
-          }
+        // Advocates transfer only their own leads (checked above), to an advocate in any office; the lead
+        // then moves to that advocate's office. Super-admins choose the office themselves.
+        if (!superAdmin && !target.handlingOfficeId) {
+          throw badRequest('Target advocate has no office yet');
         }
       }
 
       let toOffice = null;
       // An unrouted lead (no office, e.g. a website lead without a city) takes the new advocate's office.
-      const wantedOfficeId = toOfficeId || (!lead.handlingOfficeId && target && target.handlingOfficeId) || null;
+      const followsAdvocate = target && target.handlingOfficeId && (!superAdmin || !lead.handlingOfficeId);
+      const wantedOfficeId = toOfficeId || (followsAdvocate ? target.handlingOfficeId : null);
       if (wantedOfficeId && wantedOfficeId !== lead.handlingOfficeId) {
         toOffice = await HandlingOffice.findOne({ where: { id: wantedOfficeId, status: 'active' }, transaction });
         if (!toOffice) throw badRequest('Target office not found or inactive');
