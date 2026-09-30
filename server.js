@@ -33,3 +33,4 @@ require('./cron/nextDayHearingCron');
 require('./cron/linkCleanupCron');
 require('./cron/invoiceReminderCron');
 require('./cron/overdueHearingCron');
+require('./cron/leadAuditRetentionCron');
