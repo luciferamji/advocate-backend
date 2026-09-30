@@ -72,7 +72,7 @@ exports.deleteLeadSource = async (req, res, next) => {
       return next(new ErrorResponse('Source not found', 'SOURCE_NOT_FOUND'));
     }
 
-    const leadCount = await Lead.count({ where: { leadSourceId: source.id } });
+    const leadCount = await Lead.count({ where: { leadSourceId: source.id }, paranoid: false }); // soft-deleted leads still reference it
     if (leadCount > 0) {
       await source.update({ status: 'inactive' });
       return res.status(200).json({ success: true, message: 'Source deactivated (has linked leads)' });
