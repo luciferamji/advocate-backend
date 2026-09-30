@@ -64,12 +64,19 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.UUID,
       allowNull: false
     },
+    // Creator of the lead (never changes)
     createdBy: {
+      type: DataTypes.UUID,
+      allowNull: false
+    },
+    // Current owner of the lead (changes on transfer). Reports / "owner" use this.
+    assignedTo: {
       type: DataTypes.UUID,
       allowNull: false
     }
   }, {
     timestamps: true,
+    paranoid: true, // soft delete via deletedAt; activity logs are kept
     tableName: 'leads'
   });
 

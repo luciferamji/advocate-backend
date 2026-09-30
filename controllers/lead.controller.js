@@ -54,7 +54,8 @@ exports.createLead = async (req, res, next) => {
       location: location || null, disposition: disposition || 'New',
       followUpDate: followUpDate || null,
       handlingOfficeId, leadSourceId,
-      createdBy: req.user.id
+      createdBy: req.user.id,
+      assignedTo: req.user.id
     });
 
     await logActivity(lead.id, 'Lead created', null, null, null, req.user.id);
@@ -499,7 +500,8 @@ exports.requestConsultation = async (req, res, next) => {
       followUpDate: preferredDate,
       handlingOfficeId: handlingOffice.id,
       leadSourceId: leadSource.id,
-      createdBy: defaultOwner.id
+      createdBy: defaultOwner.id,
+      assignedTo: defaultOwner.id
     });
 
     // Send notification email

@@ -298,9 +298,32 @@ db.Admin.hasMany(db.Lead, {
   foreignKey: 'createdBy',
   as: 'leads'
 });
+// "owner" = current assignee (used by reports and the UI); "creator" = who created it
+db.Lead.belongsTo(db.Admin, {
+  foreignKey: 'assignedTo',
+  as: 'owner',
+  onDelete: 'NO ACTION',
+  onUpdate: 'CASCADE'
+});
 db.Lead.belongsTo(db.Admin, {
   foreignKey: 'createdBy',
-  as: 'owner'
+  as: 'creator'
+});
+db.Admin.hasMany(db.Lead, {
+  foreignKey: 'assignedTo',
+  as: 'assignedLeads'
+});
+
+// Advocate - HandlingOffice (each advocate works in one office)
+db.Admin.belongsTo(db.HandlingOffice, {
+  foreignKey: 'handlingOfficeId',
+  as: 'handlingOffice',
+  constraints: false // FK is created by the migration (ON DELETE SET NULL)
+});
+db.HandlingOffice.hasMany(db.Admin, {
+  foreignKey: 'handlingOfficeId',
+  as: 'members',
+  constraints: false
 });
 
 db.Lead.hasMany(db.LeadActivityLog, {

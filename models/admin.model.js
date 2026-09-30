@@ -37,6 +37,12 @@ module.exports = (sequelize, DataTypes) => {
     sessionId: {
       type: DataTypes.STRING,
       allowNull: true
+    },
+    // Office the advocate works in (one office per advocate; NULL for super-admins
+    // and for advocates not yet assigned). Added by migrations/add-lead-assignment-and-office.js
+    handlingOfficeId: {
+      type: DataTypes.UUID,
+      allowNull: true
     }
   }, {
     timestamps: true,

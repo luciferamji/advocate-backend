@@ -7,8 +7,10 @@ const PORT = process.env.PORT || 5000;
 // Start server
 const startServer = async () => {
   try {
-    // Sync database
-    await sequelize.sync({ alter: process.env.NODE_ENV === 'development' });
+    // Sync database. Schema changes on existing tables are done by the scripts in
+    // migrations/ (run by hand); alter-sync is opt-in (DB_SYNC_ALTER=true, local
+    // dev only) so it never races/fights a migration on a shared database.
+    await sequelize.sync({ alter: process.env.DB_SYNC_ALTER === 'true' });
     console.log('Database connected successfully');
     
     // Create super admin if doesn't exist
