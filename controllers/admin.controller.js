@@ -1,6 +1,13 @@
 const bcrypt = require('bcryptjs');
-const { Admin, Advocate } = require('../models');
+const { Admin, Advocate, HandlingOffice } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isActiveOffice = async (id) => !!(id && UUID_RE.test(String(id)) &&
+  await HandlingOffice.findOne({ where: { id, status: 'active' } }));
+const officeRequired = () => new ErrorResponse(
+  'Advocates must be assigned to an office (handlingOfficeId)', 'VALIDATION_ERROR', { required: ['handlingOfficeId'] }, 400
+);
 
 // @desc    Get all admin users
 // @route   GET /api/admin/users
@@ -63,6 +70,10 @@ exports.createUser = async (req, res, next) => {
       return next(new ErrorResponse('Email already in use', 400));
     }
     
+    if (role === 'advocate' && !(await isActiveOffice(req.body.handlingOfficeId))) {
+      return next(officeRequired());
+    }
+
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -72,7 +83,8 @@ exports.createUser = async (req, res, next) => {
       name,
       email,
       password: hashedPassword,
-      role
+      role,
+      handlingOfficeId: role === 'advocate' ? req.body.handlingOfficeId : null
     });
     
     // Create advocate entry if role is advocate
@@ -122,6 +134,15 @@ exports.updateUser = async (req, res, next) => {
     // Update user
     user.name = name || user.name;
     user.email = email || user.email;
+
+    const finalRole = role || user.role;
+    if (req.body.handlingOfficeId !== undefined && req.body.handlingOfficeId !== user.handlingOfficeId) {
+      if (!(await isActiveOffice(req.body.handlingOfficeId))) return next(officeRequired());
+      user.handlingOfficeId = req.body.handlingOfficeId;
+    }
+    if (finalRole === 'advocate' && !user.handlingOfficeId) {
+      return next(officeRequired());
+    }
     
     // Handle role change
     if (role && role !== user.role) {

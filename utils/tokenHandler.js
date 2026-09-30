@@ -44,6 +44,7 @@ const sendTokenResponse = async (user, statusCode, res) => {
     email: user.email,
     role: user.role,
     phone: user.phone,
+    handlingOfficeId: user.handlingOfficeId || null,
     advocate: user.advocate ? {
       barNumber: user.advocate.barNumber,
       specialization: user.advocate.specialization

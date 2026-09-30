@@ -1,10 +1,24 @@
 const bcrypt = require('bcryptjs');
-const { Admin, Advocate, Case, Client, sequelize, Invoice } = require('../models');
+const { Admin, Advocate, Case, Client, sequelize, Invoice, HandlingOffice } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
 const { Op } = require('sequelize');
 const { sendEmail} = require('../utils/email');
 const {advocateWelcome} = require('../emailTemplates/advocateOnboarding');
 
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Each advocate works in exactly one (active) handling office
+const findActiveOffice = async (id) => {
+  if (!id || !UUID_RE.test(String(id))) return null;
+  return HandlingOffice.findOne({ where: { id, status: 'active' } });
+};
+
+const officeRequiredError = () => new ErrorResponse(
+  'Please select the advocate\'s office', 'VALIDATION_ERROR', { required: ['handlingOfficeId'] }, 400
+);
+
+const officeInclude = { model: HandlingOffice, as: 'handlingOffice', attributes: ['id', 'name'], required: false };
 
 const validateAdvocate = async (adminId) => {
   const admin = await Admin.findOne({ where: { id: adminId, role: 'advocate' } });
@@ -50,7 +64,8 @@ exports.getAdvocates = async (req, res, next) => {
           model: Case,
           as: 'cases',
           required: false
-        }
+        },
+        officeInclude
       ],
       order: [[sortBy, sortOrder.toUpperCase()]],
       limit: parseInt(limit),
@@ -66,6 +81,8 @@ exports.getAdvocates = async (req, res, next) => {
       barNumber: admin.advocate?.barNumber || '',
       specialization: admin.advocate?.specialization || '',
       status: admin.status || 'active',
+      handlingOfficeId: admin.handlingOfficeId || '',
+      handlingOfficeName: admin.handlingOffice?.name || '',
       joinDate: admin.createdAt,
       caseCount: admin.cases?.length || 0
     }));
@@ -103,7 +120,8 @@ exports.getAdvocate = async (req, res, next) => {
           model: Case,
           as: 'cases',
           required: false
-        }
+        },
+        officeInclude
       ]
     });
 
@@ -119,6 +137,8 @@ exports.getAdvocate = async (req, res, next) => {
       barNumber: advocate.advocate.barNumber,
       specialization: advocate.advocate.specialization || '',
       status: advocate.status || 'active',
+      handlingOfficeId: advocate.handlingOfficeId || '',
+      handlingOfficeName: advocate.handlingOffice?.name || '',
       joinDate: advocate.createdAt,
       caseCount: advocate.cases.length,
       cases: advocate.cases.map(caseItem => ({
@@ -139,14 +159,19 @@ exports.getAdvocate = async (req, res, next) => {
 // @access  Private/Super-Admin
 exports.createAdvocate = async (req, res, next) => {
   try {
-    const { name, email, phone, barNumber, specialization } = req.body;
+    const { name, email, phone, barNumber, specialization, handlingOfficeId } = req.body;
 
     if (!name || !email || !barNumber) {
       return next(new ErrorResponse(
         'Please provide all required fields',
         'VALIDATION_ERROR',
-        { required: ['name', 'email', 'barNumber'] }
+        { required: ['name', 'email', 'barNumber', 'handlingOfficeId'] }
       ));
+    }
+
+    const office = await findActiveOffice(handlingOfficeId);
+    if (!office) {
+      return next(officeRequiredError());
     }
 
     // Check if email exists
@@ -170,7 +195,8 @@ exports.createAdvocate = async (req, res, next) => {
       phone,
       password: hashedPassword,
       role: 'advocate',
-      status: 'active'
+      status: 'active',
+      handlingOfficeId: office.id
     });
 
     // Create advocate profile
@@ -197,6 +223,8 @@ exports.createAdvocate = async (req, res, next) => {
       barNumber,
       specialization: specialization || '',
       status: admin.status,
+      handlingOfficeId: office.id,
+      handlingOfficeName: office.name,
       joinDate: admin.createdAt
     });
   } catch (error) {
@@ -226,7 +254,14 @@ exports.updateAdvocate = async (req, res, next) => {
       return next(new ErrorResponse('Advocate not found', 'ADVOCATE_NOT_FOUND', { id: req.params.id }));
     }
 
-    const { name, email, phone, barNumber, specialization, status } = req.body;
+    const { name, email, phone, barNumber, specialization, status, handlingOfficeId } = req.body;
+
+    // Office is required for advocates: keep the current one unless a new one is given
+    const officeId = handlingOfficeId !== undefined && handlingOfficeId !== '' ? handlingOfficeId : advocate.handlingOfficeId;
+    const office = await findActiveOffice(officeId);
+    if (!office && !(officeId && officeId === advocate.handlingOfficeId)) {
+      return next(officeRequiredError());
+    }
 
     // Check if email is being changed and already exists
     if (email && email !== advocate.email) {
@@ -241,6 +276,7 @@ exports.updateAdvocate = async (req, res, next) => {
     advocate.email = email || advocate.email;
     advocate.phone = phone || advocate.phone;
     advocate.status = status || advocate.status;
+    advocate.handlingOfficeId = officeId;
     await advocate.save();
 
     // Update advocate details
@@ -256,6 +292,8 @@ exports.updateAdvocate = async (req, res, next) => {
       barNumber: advocate.advocate.barNumber,
       specialization: advocate.advocate.specialization || '',
       status: advocate.status,
+      handlingOfficeId: advocate.handlingOfficeId || '',
+      handlingOfficeName: office?.name || '',
       joinDate: advocate.createdAt
     });
   } catch (error) {

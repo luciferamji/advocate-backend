@@ -98,6 +98,7 @@ exports.getMe = async (req, res, next) => {
       role: user.role,
       phone: user.phone,
       active: user.status,
+      handlingOfficeId: user.handlingOfficeId || null,
       advocate: user.advocate ? {
         barNumber: user.advocate.barNumber,
         specialization: user.advocate.specialization
@@ -163,6 +164,7 @@ exports.updateDetails = async (req, res, next) => {
       email: updatedUser.email,
       role: updatedUser.role,
       phone: updatedUser.phone,
+      handlingOfficeId: updatedUser.handlingOfficeId || null,
       advocate: updatedUser.advocate ? {
         barNumber: updatedUser.advocate.barNumber,
         specialization: updatedUser.advocate.specialization
