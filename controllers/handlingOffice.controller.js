@@ -1,5 +1,13 @@
-const { HandlingOffice, Lead } = require('../models');
+const { HandlingOffice, Lead, Admin } = require('../models');
 const ErrorResponse = require('../utils/errorHandler');
+const { canonicalOfficeName, officeKey } = require('../utils/offices');
+
+// "Bangalore" and "Bengaluru" (etc.) are the same office: compare normalised names
+const findOfficeByName = async (name, excludeId = null) => {
+  const key = officeKey(name);
+  const offices = await HandlingOffice.findAll({ attributes: ['id', 'name'] });
+  return offices.find(o => o.id !== excludeId && officeKey(o.name) === key) || null;
+};
 
 // @desc    Get all handling offices
 // @route   GET /api/handling-offices
@@ -28,14 +36,14 @@ exports.getHandlingOffices = async (req, res, next) => {
 // @access  Private (super-admin)
 exports.createHandlingOffice = async (req, res, next) => {
   try {
-    const { name } = req.body;
+    const name = canonicalOfficeName(req.body.name);
     if (!name) {
       return next(new ErrorResponse('Office name is required', 'VALIDATION_ERROR'));
     }
 
-    const existing = await HandlingOffice.findOne({ where: { name } });
+    const existing = await findOfficeByName(name);
     if (existing) {
-      return next(new ErrorResponse('Office with this name already exists', 'DUPLICATE_OFFICE'));
+      return next(new ErrorResponse(`Office "${existing.name}" already exists`, 'DUPLICATE_OFFICE'));
     }
 
     const office = await HandlingOffice.create({ name });
@@ -55,7 +63,20 @@ exports.updateHandlingOffice = async (req, res, next) => {
       return next(new ErrorResponse('Office not found', 'OFFICE_NOT_FOUND'));
     }
 
-    await office.update(req.body);
+    const updates = {};
+    if (req.body.name !== undefined) {
+      updates.name = canonicalOfficeName(req.body.name);
+      if (!updates.name) {
+        return next(new ErrorResponse('Office name is required', 'VALIDATION_ERROR'));
+      }
+      const existing = await findOfficeByName(updates.name, office.id);
+      if (existing) {
+        return next(new ErrorResponse(`Office "${existing.name}" already exists`, 'DUPLICATE_OFFICE'));
+      }
+    }
+    if (req.body.status !== undefined) updates.status = req.body.status;
+
+    await office.update(updates);
     res.status(200).json({ success: true, data: office });
   } catch (error) {
     next(new ErrorResponse(error.message, 'OFFICE_UPDATE_ERROR'));
@@ -72,10 +93,14 @@ exports.deleteHandlingOffice = async (req, res, next) => {
       return next(new ErrorResponse('Office not found', 'OFFICE_NOT_FOUND'));
     }
 
-    const leadCount = await Lead.count({ where: { handlingOfficeId: office.id } });
-    if (leadCount > 0) {
+    // soft-deleted leads and advocates still reference the office
+    const [leadCount, memberCount] = await Promise.all([
+      Lead.count({ where: { handlingOfficeId: office.id }, paranoid: false }),
+      Admin.count({ where: { handlingOfficeId: office.id } })
+    ]);
+    if (leadCount > 0 || memberCount > 0) {
       await office.update({ status: 'inactive' });
-      return res.status(200).json({ success: true, message: 'Office deactivated (has linked leads)' });
+      return res.status(200).json({ success: true, message: 'Office deactivated (has linked leads or advocates)' });
     }
 
     await office.destroy();
